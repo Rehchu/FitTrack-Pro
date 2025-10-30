@@ -7,3 +7,6 @@ base = "integrations/cloudflare"
 
 [build.environment]
 NODE_VERSION = "20.18.0"
+
+[deploy]
+command = "cd integrations/cloudflare && npx wrangler versions upload"
