@@ -30,13 +30,9 @@ Expected output:
 Total Upload: XX.XX KiB / gzip: XX.XX KiB
 Uploaded fittrack-pro-desktop (X.XX sec)
 Published fittrack-pro-desktop (X.XX sec)
-  https://fittrack-pro-desktop.rehchu1.workers.dev
-```
 
 ## Step 3: Test Endpoints
 
-### Test Trainer Profile Endpoint
-```powershell
 # Get trainer profile
 curl https://fittrack-pro-desktop.rehchu1.workers.dev/api/trainers/1/profile
 ```
