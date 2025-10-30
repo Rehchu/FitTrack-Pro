@@ -62,6 +62,7 @@ out/
 desktop-app/dist/
 desktop-app/dist-new/
 desktop-app/build/
+desktop-app/build-output/
 desktop-app/node_modules/
 desktop-app/.cache/
 

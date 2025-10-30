@@ -7,8 +7,8 @@ export default defineConfig({
   root: path.resolve(__dirname),
   base: './', // Use relative paths for Electron
   build: {
-    outDir: path.resolve(__dirname, '../../dist-new'),
-    emptyOutDir: true
+    outDir: path.resolve(__dirname, '../../dist'),
+    emptyOutDir: false  // Don't delete electron-builder output
   },
   server: {
     port: 5173

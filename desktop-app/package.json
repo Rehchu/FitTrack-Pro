@@ -17,13 +17,13 @@
     "appId": "com.fittrackpro.app",
     "productName": "FitTrack Pro",
     "directories": {
-      "output": "dist-new",
+      "output": "build-output",
       "buildResources": "build"
     },
     "files": [
       "src/**/*",
-      "dist-new/index.html",
-      "dist-new/assets/**/*",
+      "dist/index.html",
+      "dist/assets/**/*",
       "node_modules/**/*"
     ],
     "asarUnpack": [

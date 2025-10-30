@@ -1,0 +1,41 @@
+name = "fittrack-trainer"
+main = "index.js"
+compatibility_date = "2024-01-01"
+account_id = "4f61fb25b226afc8c61c1b069ea14ed9"
+workers_dev = true
+
+compatibility_flags = [
+  "nodejs_compat"
+]
+
+# Cloudflare bindings - matching the parent worker's bindings
+[[d1_databases]]
+binding = "FITTRACK_D1"
+database_name = "fittrack-pro-db"
+database_id = "4bc69687-f28a-4be1-9a0d-d3bc0b0583d2"
+
+[[r2_buckets]]
+binding = "R2_UPLOADS"
+bucket_name = "fittrack-uploads"
+
+[[kv_namespaces]]
+binding = "FITTRACK_KV"
+id = "d31f5b43bd964ce78d87d9dd5878cc25"
+
+[ai]
+binding = "AI"
+
+# Analytics Engine
+[[analytics_engine_datasets]]
+binding = "ANALYTICS"
+dataset = "fittrack_trainer_events"
+
+# Environment variables
+[vars]
+ENVIRONMENT = "production"
+ALLOWED_ORIGINS = "*"
+
+[observability]
+enabled = true
+
+

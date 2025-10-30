@@ -29,12 +29,12 @@ function createWindow () {
     }
   })
 
-  // In production, the renderer is built by Vite and lives in dist-new/
+  // In production, the renderer is built by Vite and lives in dist/
   // In development, it's served from src/renderer/
   const isDev = !app.isPackaged
   const rendererPath = isDev 
     ? path.join(__dirname, 'renderer', 'index.html')
-    : path.join(__dirname, '..', 'dist-new', 'index.html')
+    : path.join(__dirname, '..', 'dist', 'index.html')
 
   console.log(`Loading renderer from: ${rendererPath}`)
   console.log(`App packaged: ${app.isPackaged}`)
@@ -275,6 +275,19 @@ ipcMain.handle('set-custom-api', async (event, { base }) => {
 app.whenReady().then(async () => {
   createWindow()
 
+  // PRODUCTION MODE: Skip Cloudflare Tunnel startup - using production Worker instead
+  console.log('Production mode: Using https://fittrack-pro-desktop.rehchu1.workers.dev')
+  console.log('Skipping local Cloudflare Tunnel startup')
+  
+  // Notify renderer that we're in production mode (no tunnel needed)
+  setTimeout(() => {
+    const windows = BrowserWindow.getAllWindows()
+    if (windows.length > 0) {
+      windows[0].webContents.send('tunnel-ready', 'https://fittrack-pro-desktop.rehchu1.workers.dev')
+    }
+  }, 1000)
+
+  /* DISABLED FOR PRODUCTION - Uncomment for local development
   // Auto-start Cloudflare Tunnel on app launch
   try {
     console.log('Auto-starting Cloudflare Tunnel...')
@@ -341,6 +354,7 @@ app.whenReady().then(async () => {
   } catch (error) {
     console.error('Tunnel auto-start failed:', error.message)
   }
+  */ // END PRODUCTION DISABLE
 
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

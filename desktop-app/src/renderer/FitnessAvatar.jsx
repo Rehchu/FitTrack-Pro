@@ -16,8 +16,8 @@ export function FitnessAvatar({
   const metrics = useMemo(() => {
     const clampedScore = Math.max(0, Math.min(100, progressScore));
     
-    // Avatar size: 140px - 220px based on score
-    const avatarSize = 140 + (clampedScore * 0.8);
+    // Avatar size: Use provided size prop (default 180px)
+    const avatarSize = size;
     
     // Border color based on score ranges
     let borderColor = '#FF4B39'; // Red (0-39)
@@ -28,8 +28,8 @@ export function FitnessAvatar({
     // Glow intensity: 0.2 - 0.8
     const glowOpacity = 0.2 + (clampedScore / 100) * 0.6;
     
-    // Scale animation: 0.85x - 1.15x
-    const scaleMultiplier = 0.85 + (clampedScore / 100) * 0.3;
+    // Scale animation: subtle 0.95x - 1.05x for pulse effect only
+    const scaleMultiplier = 1.0;
     
     // Pulse animation for excellent progress
     const shouldPulse = clampedScore >= 70;
@@ -41,7 +41,7 @@ export function FitnessAvatar({
       scale: scaleMultiplier,
       pulse: shouldPulse
     };
-  }, [progressScore]);
+  }, [progressScore, size]);
 
   const containerStyle = {
     display: 'inline-block',

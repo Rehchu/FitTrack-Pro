@@ -1,12 +1,12 @@
 {
-  "name": "My Fitness Journey - FitTrack Pro",
-  "short_name": "FitTrack",
-  "description": "Your personal fitness progress tracker",
+  "name": "FitTrack Pro - Trainer Dashboard",
+  "short_name": "FitTrack Pro",
+  "description": "Professional client management for fitness trainers",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#1a1a2e",
-  "theme_color": "#FF4B39",
-  "orientation": "portrait",
+  "background_color": "#1a1d2e",
+  "theme_color": "#673AB7",
+  "orientation": "any",
   "icons": [
     {
       "src": "/animations/gym-fitness.json",
@@ -15,14 +15,26 @@
       "purpose": "any maskable"
     }
   ],
-  "categories": ["health", "fitness", "lifestyle"],
+  "categories": ["health", "fitness", "productivity", "business"],
   "screenshots": [],
   "shortcuts": [
     {
-      "name": "View Progress",
-      "short_name": "Progress",
-      "description": "See your fitness progress",
-      "url": "/",
+      "name": "My Clients",
+      "short_name": "Clients",
+      "description": "View and manage clients",
+      "url": "/clients",
+      "icons": [
+        {
+          "src": "/animations/gym-fitness.json",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "Calendar",
+      "short_name": "Calendar",
+      "description": "View scheduled sessions",
+      "url": "/calendar",
       "icons": [
         {
           "src": "/animations/gym-fitness.json",
@@ -30,5 +42,6 @@
         }
       ]
     }
-  ]
+  ],
+  "prefer_related_applications": false
 }

@@ -1,8 +1,9 @@
-import { ThemeProvider, createTheme } from '@mui/material';
+import { ThemeProvider, createTheme, useMediaQuery } from '@mui/material';
 import { useEffect, useMemo } from 'react';
 import { BrowserRouter } from 'react-router-dom';
 import { AppRoutes } from './routes';
 import { AppSidebar } from './components/layout/AppSidebar';
+import { MobileNavigation } from './components/layout/MobileNavigation';
 import { useColorScheme } from './hooks/useColorScheme';
 import { useBrandingStore } from './stores/brandingStore';
 import { NotificationsProvider } from './providers/NotificationsProvider';
@@ -30,6 +31,8 @@ export function App() {
     },
   }), [colorScheme, primaryColor, secondaryColor]);
 
+  const isMobile = useMediaQuery(customTheme.breakpoints.down('md'));
+
   // Listen for system color scheme changes
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -45,13 +48,22 @@ export function App() {
     <ThemeProvider theme={customTheme}>
       <NotificationsProvider>
         <BrowserRouter>
-          <div className="flex h-screen bg-gray-100 dark:bg-gray-900 transition-colors">
-            <AppSidebar onStartTour={() => setRunTour(true)} />
-            <main className="flex-1 overflow-auto">
-              <AppRoutes />
-            </main>
-            <AppTutorial run={runTour} onClose={() => setRunTour(false)} />
-          </div>
+          {isMobile ? (
+            <div className="flex flex-col h-screen bg-gray-100 dark:bg-gray-900">
+              <MobileNavigation />
+              <main className="flex-1 overflow-auto">
+                <AppRoutes />
+              </main>
+            </div>
+          ) : (
+            <div className="flex h-screen bg-gray-100 dark:bg-gray-900 transition-colors">
+              <AppSidebar onStartTour={() => setRunTour(true)} />
+              <main className="flex-1 overflow-auto">
+                <AppRoutes />
+              </main>
+              <AppTutorial run={runTour} onClose={() => setRunTour(false)} />
+            </div>
+          )}
         </BrowserRouter>
       </NotificationsProvider>
     </ThemeProvider>

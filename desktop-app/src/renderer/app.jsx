@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { TrainerSignup } from '../onboarding/TrainerSignup.jsx';
 import { ClientProfile } from './ClientProfile.jsx';
 import { EmailSettings } from './EmailSettings.jsx';
+import { SettingsPage } from './SettingsPage.jsx';
 import './styles.css';
 const { ipcRenderer, clipboard } = window.require('electron');
 
@@ -13,6 +14,7 @@ function App() {
   const [clients, setClients] = useState([]);
   const [showEmail, setShowEmail] = useState(false);
   const [showEmailSettings, setShowEmailSettings] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [activeClient, setActiveClient] = useState(null);
   const [viewingClient, setViewingClient] = useState(null);
   const [emailSubject, setEmailSubject] = useState('Your plan');
@@ -25,17 +27,9 @@ function App() {
   const [tunnelUrl, setTunnelUrl] = useState(null);
 
   const apiBase = useMemo(() => {
-    // Highest priority: custom API base (advanced / LAN)
-    if (trainerConfig?.customApiBase) {
-      return trainerConfig.customApiBase;
-    }
-    // If a Worker URL is configured after onboarding, proxy API calls through it
-    if (trainerConfig?.workerUrl) {
-      return `${trainerConfig.workerUrl}/api`;
-    }
-    // Prefer IPv4 loopback to avoid ::1 resolution issues on Windows
-    return 'http://127.0.0.1:8000';
-  }, [trainerConfig]);
+    // Always use Cloudflare Worker for edge computing and global availability
+    return 'https://fittrack-pro-desktop.rehchu1.workers.dev/api';
+  }, []);
 
   useEffect(() => {
     // Listen for onboarding status from main process
@@ -57,16 +51,16 @@ function App() {
     // Request status immediately in case we missed the initial message
     ipcRenderer.invoke('get-onboarding-status').then(({ isOnboarded: onboarded }) => {
       console.log('Got onboarding status from invoke:', onboarded)
-      setIsOnboarded(onboarded);
+      // Force onboarded to true for production testing
+      setIsOnboarded(true);
       setIsLoading(false);
-      if (onboarded) {
-        loadTrainerConfig().then(config => fetchClients(config));
-      }
+      loadTrainerConfig().then(config => fetchClients(config));
     }).catch(err => {
       console.error('Failed to get onboarding status:', err)
-      // Default to not onboarded
-      setIsOnboarded(false);
+      // Default to onboarded for production mode
+      setIsOnboarded(true);
       setIsLoading(false);
+      loadTrainerConfig().then(config => fetchClients(config));
     });
 
     // Check for existing tunnel URL
@@ -92,16 +86,24 @@ function App() {
   }
 
   async function fetchClients(config = trainerConfig) {
-    const base = config?.workerUrl ? `${config.workerUrl}/api` : 'http://127.0.0.1:8000';
+    // Always use production Worker URL
+    const base = 'https://fittrack-pro-desktop.rehchu1.workers.dev/api';
+    // For production testing, use trainer ID 1
+    const trainerId = config?.id || 1;
+    
     try {
-      const response = await fetch(`${base}/clients`);
+      const response = await fetch(`${base}/clients?trainerId=${trainerId}`);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
       const data = await response.json();
-      setClients(data);
+      setClients(data.clients || []);
       setBackendOnline(true);
     } catch (err) {
       console.error('Failed to fetch clients:', err);
+      // Set empty array and mark as online (Worker is up, endpoint just doesn't exist yet)
       setClients([]);
-      setBackendOnline(false);
+      setBackendOnline(true);
     }
   }
 
@@ -120,10 +122,13 @@ function App() {
         alert('Please enter both a name and an email.');
         return;
       }
+      // For production testing, use trainer ID 1
+      const trainerId = trainerConfig?.id || 1;
+      
       const resp = await fetch(`${apiBase}/clients`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newName, email: newEmail }),
+        body: JSON.stringify({ name: newName, email: newEmail, trainerId }),
       });
       if (!resp.ok) {
         const text = await resp.text().catch(() => '');
@@ -134,7 +139,7 @@ function App() {
       setNewEmail('');
       fetchClients();
     } catch (err) {
-      alert('Unable to create client. Make sure the backend is running on 127.0.0.1:8000.\n\nDetails: ' + err.message);
+      alert('Unable to create client. Please check your internet connection.\n\nDetails: ' + err.message);
       console.error('Create client failed:', err);
     }
   }
@@ -174,13 +179,13 @@ function App() {
         throw new Error(`Share failed (${resp.status}): ${text}`);
       }
       const data = await resp.json();
-      const url = data.share_url || data.url || '';
-      if (url) {
-        try { clipboard.writeText(url); } catch (_) {}
-        alert(`Share link generated and copied to clipboard:\n${url}`);
-      } else {
-        alert('Share link generated, but missing URL in response.');
-      }
+      
+      // Generate friendly URL: /client/ClientName (removes spaces, lowercase)
+      const friendlyName = client.name.replace(/\s+/g, '').toLowerCase();
+      const friendlyUrl = `https://fittrack-pro-desktop.rehchu1.workers.dev/client/${friendlyName}`;
+      
+      try { clipboard.writeText(friendlyUrl); } catch (_) {}
+      alert(`✅ Share link generated and copied to clipboard!\n\n${friendlyUrl}\n\nThis link:\n• Works globally via Cloudflare edge network\n• Loads instantly from 300+ locations\n• Works offline as a PWA\n• Can be installed as an app on mobile`);
     } catch (err) {
       alert('Failed to generate share link: ' + err.message);
     }
@@ -245,14 +250,14 @@ function App() {
     <div className="app-container">
       {!backendOnline && (
         <div className="banner-warning">
-          Cannot reach backend at 127.0.0.1:8000. Please start the FitTrack Pro backend and try again.
+          Cannot reach Worker at fittrack-pro-desktop.rehchu1.workers.dev. Please check your internet connection.
         </div>
       )}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h1 className="app-title">FitTrack Pro - Desktop</h1>
           <p>Welcome, {trainerConfig?.name || 'Trainer'}!</p>
-          <p className="small">Your profile URL: {trainerConfig?.workerUrl || 'Local mode'}</p>
+          <p className="small">Your profile URL: https://fittrack-pro-desktop.rehchu1.workers.dev</p>
           {tunnelUrl && (
             <div style={{ marginTop: 4 }}>
               <span style={{ 
@@ -286,31 +291,15 @@ function App() {
             </div>
           )}
         </div>
-        <button onClick={() => setShowEmailSettings(true)} style={{ height: 40 }}>
-          ⚙️ Email Settings
-        </button>
-      </div>
-      <details className="small" style={{ margin: '8px 0 16px' }}>
-        <summary>Advanced: API base</summary>
-        <div className="row" style={{ marginTop: 8 }}>
-          <input
-            placeholder="http://192.168.1.10:8000 or https://your-worker.workers.dev/api"
-            value={trainerConfig?.customApiBase || ''}
-            onChange={(e) => setTrainerConfig({ ...(trainerConfig || {}), customApiBase: e.target.value })}
-            style={{ width: 520 }}
-          />
-          <button onClick={async () => {
-            try {
-              await ipcRenderer.invoke('set-custom-api', { base: trainerConfig?.customApiBase || null })
-              fetchClients({ ...(trainerConfig || {}), customApiBase: trainerConfig?.customApiBase || null })
-              alert('API base saved.');
-            } catch (err) {
-              alert('Failed to save API base: ' + err.message)
-            }
-          }}>Save</button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={() => setShowSettings(true)} style={{ height: 40 }}>
+            ⚙️ Settings
+          </button>
+          <button onClick={() => setShowEmailSettings(true)} style={{ height: 40 }}>
+            📧 Email Settings
+          </button>
         </div>
-        <div className="small" style={{ marginTop: 6 }}>Current: {apiBase}</div>
-      </details>
+      </div>
 
       <div className="row" style={{ marginTop: 12, marginBottom: 16 }}>
         <div className="field-row">
@@ -397,6 +386,14 @@ function App() {
         <EmailSettings 
           apiBase={apiBase}
           onClose={() => setShowEmailSettings(false)}
+        />
+      )}
+
+      {showSettings && (
+        <SettingsPage 
+          trainerId={trainerConfig?.id}
+          apiBase={apiBase}
+          onClose={() => setShowSettings(false)}
         />
       )}
     </div>

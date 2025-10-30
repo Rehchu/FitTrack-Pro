@@ -1,0 +1,35 @@
+{
+  "name": "fittrack-pro-desktop",
+  "main": "integrations/cloudflare/worker-enhanced.js",
+  "compatibility_date": "2025-10-28",
+  "compatibility_flags": ["nodejs_compat"],
+  "account_id": "4f61fb25b226afc8c61c1b069ea14ed9",
+  "workers_dev": true,
+  "kv_namespaces": [
+    { "binding": "FITTRACK_KV", "id": "d31f5b43bd964ce78d87d9dd5878cc25" }
+  ],
+  "d1_databases": [
+    { "binding": "FITTRACK_D1", "database_name": "fittrack-pro-db", "database_id": "4bc69687-f28a-4be1-9a0d-d3bc0b0583d2" }
+  ],
+  "ai": { "binding": "AI" },
+  "analytics_engine_datasets": [
+    { "binding": "ANALYTICS", "dataset": "fittrack_events" }
+  ],
+  "vectorize": [
+    { "binding": "VECTORIZE", "index_name": "fittrack-exercises" }
+  ],
+  "durable_objects": {
+    "bindings": [
+      { "name": "CHAT_ROOM", "class_name": "ChatRoom", "script_name": "fittrack-pro-desktop" }
+    ]
+  },
+  "r2_buckets": [
+    { "binding": "R2_UPLOADS", "bucket_name": "fittrack-uploads" }
+  ],
+  "vars": {
+    "BACKEND_ORIGIN": "",
+    "WORKER_URL": "https://fittrack-pro-desktop.rehchu1.workers.dev",
+    "ALLOWED_ORIGINS": "*"
+  },
+  "observability": { "enabled": true }
+}

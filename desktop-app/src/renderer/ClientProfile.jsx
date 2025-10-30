@@ -2,6 +2,237 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { FitnessAvatar, calculateProgressScore } from './FitnessAvatar';
 import { WorkoutBuilder } from './WorkoutBuilder';
 import { MealBuilder } from './MealBuilder';
+import { ChatTab } from './ChatTab';
+import { VideoCallTab } from './VideoCallTab';
+import { QuestTab } from './QuestTab';
+import { DemographicsTab } from './DemographicsTab';
+
+/**
+ * Categorized Navigation Menu Component
+ * Groups features into logical categories with icon-based dropdowns
+ */
+function NavigationMenu({ activeTab, setActiveTab }) {
+  const [openCategory, setOpenCategory] = useState(null);
+
+  const categories = [
+    {
+      id: 'overview',
+      icon: '📊',
+      label: 'Overview',
+      items: [
+        { id: 'summary', icon: '🏠', label: 'Summary' },
+        { id: 'measurements', icon: '📏', label: 'Measurements' }
+      ]
+    },
+    {
+      id: 'training',
+      icon: '💪',
+      label: 'Training',
+      items: [
+        { id: 'workouts', icon: '🏋️', label: 'Workouts' },
+        { id: 'meals', icon: '🍽️', label: 'Meals' },
+        { id: 'achievements', icon: '🏆', label: 'Achievements' },
+        { id: 'quests', icon: '🎯', label: 'Quests' }
+      ]
+    },
+    {
+      id: 'communication',
+      icon: '💬',
+      label: 'Communication',
+      items: [
+        { id: 'chat', icon: '💬', label: 'Chat' },
+        { id: 'video', icon: '📹', label: 'Video Calls' }
+      ]
+    },
+    {
+      id: 'private',
+      icon: '🔒',
+      label: 'Private',
+      items: [
+        { id: 'demographics', icon: '👤', label: 'Demographics' }
+      ]
+    }
+  ];
+
+  const getActiveCategory = () => {
+    for (const cat of categories) {
+      if (cat.items.some(item => item.id === activeTab)) {
+        return cat;
+      }
+    }
+    return categories[0];
+  };
+
+  const getActiveItem = () => {
+    for (const cat of categories) {
+      const item = cat.items.find(i => i.id === activeTab);
+      if (item) return item;
+    }
+    return categories[0].items[0];
+  };
+
+  const activeCategory = getActiveCategory();
+  const activeItem = getActiveItem();
+
+  const toggleCategory = (categoryId) => {
+    setOpenCategory(openCategory === categoryId ? null : categoryId);
+  };
+
+  const selectItem = (itemId) => {
+    setActiveTab(itemId);
+    setOpenCategory(null);
+  };
+
+  return (
+    <div style={{ position: 'relative', width: '100%' }}>
+      {/* Current Selection Display */}
+      <div style={{
+        display: 'flex',
+        gap: 12,
+        flexWrap: 'wrap'
+      }}>
+        {categories.map(cat => {
+          const isActive = cat.id === activeCategory.id;
+          const isOpen = openCategory === cat.id;
+          
+          return (
+            <div key={cat.id} style={{ position: 'relative' }}>
+              <button
+                onClick={() => toggleCategory(cat.id)}
+                style={{
+                  padding: '10px 16px',
+                  borderRadius: 8,
+                  border: isActive ? '2px solid #FFB82B' : '1px solid #3a3f52',
+                  background: isActive ? '#FFB82B22' : '#2a2f42',
+                  color: isActive ? '#FFB82B' : '#e5e7eb',
+                  cursor: 'pointer',
+                  fontSize: 14,
+                  fontWeight: isActive ? 'bold' : 'normal',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  transition: 'all 0.2s ease',
+                  position: 'relative',
+                  minWidth: 140
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActive) {
+                    e.currentTarget.style.background = '#3a3f52';
+                    e.currentTarget.style.borderColor = '#4a4f62';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActive) {
+                    e.currentTarget.style.background = '#2a2f42';
+                    e.currentTarget.style.borderColor = '#3a3f52';
+                  }
+                }}
+              >
+                <span style={{ fontSize: 18 }}>{cat.icon}</span>
+                <span style={{ flex: 1 }}>{cat.label}</span>
+                <span style={{ 
+                  fontSize: 12, 
+                  transition: 'transform 0.2s ease',
+                  transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)'
+                }}>▼</span>
+              </button>
+
+              {/* Dropdown Menu */}
+              {isOpen && (
+                <div style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  marginTop: 8,
+                  background: '#1a1d2e',
+                  border: '1px solid #3a3f52',
+                  borderRadius: 8,
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                  zIndex: 1000,
+                  minWidth: 200,
+                  overflow: 'hidden',
+                  animation: 'slideDown 0.2s ease'
+                }}>
+                  {cat.items.map(item => {
+                    const isItemActive = item.id === activeTab;
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => selectItem(item.id)}
+                        style={{
+                          width: '100%',
+                          padding: '12px 16px',
+                          border: 'none',
+                          background: isItemActive ? '#FFB82B22' : 'transparent',
+                          color: isItemActive ? '#FFB82B' : '#e5e7eb',
+                          cursor: 'pointer',
+                          fontSize: 14,
+                          fontWeight: isItemActive ? 'bold' : 'normal',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 12,
+                          transition: 'all 0.15s ease',
+                          textAlign: 'left',
+                          borderBottom: '1px solid #2a2f42'
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!isItemActive) {
+                            e.currentTarget.style.background = '#2a2f42';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!isItemActive) {
+                            e.currentTarget.style.background = 'transparent';
+                          }
+                        }}
+                      >
+                        <span style={{ fontSize: 16 }}>{item.icon}</span>
+                        <span>{item.label}</span>
+                        {isItemActive && <span style={{ marginLeft: 'auto', color: '#1BB55C' }}>✓</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Active Item Breadcrumb */}
+      <div style={{
+        marginTop: 12,
+        padding: '8px 12px',
+        background: '#1a1d2e',
+        borderRadius: 6,
+        fontSize: 13,
+        color: '#9ca3af',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8
+      }}>
+        <span>{activeCategory.icon}</span>
+        <span>{activeCategory.label}</span>
+        <span style={{ opacity: 0.5 }}>›</span>
+        <span>{activeItem.icon}</span>
+        <span style={{ color: '#FFB82B', fontWeight: 'bold' }}>{activeItem.label}</span>
+      </div>
+
+      <style>{`
+        @keyframes slideDown {
+          from {
+            opacity: 0;
+            transform: translateY(-10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+      `}</style>
+    </div>
+  );
+}
 
 export function ClientProfile({ client, apiBase, onBack, onEmail, onShare }) {
   const [avatarUrl, setAvatarUrl] = useState(null);
@@ -272,12 +503,14 @@ export function ClientProfile({ client, apiBase, onBack, onEmail, onShare }) {
         </div>
       </div>
 
-      <div className="row" style={{ gap: 4, marginTop: 16 }}>
-        <button onClick={() => setActiveTab('summary')} className={activeTab==='summary' ? 'btn-primary' : ''}>Summary</button>
-        <button onClick={() => setActiveTab('measurements')} className={activeTab==='measurements' ? 'btn-primary' : ''}>Measurements</button>
-        <button onClick={() => setActiveTab('workouts')} className={activeTab==='workouts' ? 'btn-primary' : ''}>Workouts</button>
-        <button onClick={() => setActiveTab('meals')} className={activeTab==='meals' ? 'btn-primary' : ''}>Meals</button>
-        <button onClick={() => setActiveTab('achievements')} className={activeTab==='achievements' ? 'btn-primary' : ''}>Achievements</button>
+      <div style={{ 
+        marginTop: 16, 
+        display: 'flex', 
+        gap: 12,
+        flexWrap: 'wrap',
+        alignItems: 'center'
+      }}>
+        <NavigationMenu activeTab={activeTab} setActiveTab={setActiveTab} />
       </div>
 
       {error && <div className="banner-warning" style={{ marginTop: 12 }}>Error: {error}</div>}
@@ -526,33 +759,165 @@ export function ClientProfile({ client, apiBase, onBack, onEmail, onShare }) {
 
       {activeTab === 'workouts' && (
         <div style={{ marginTop: 16 }}>
-          <button className="btn-primary" onClick={() => setShowWorkoutBuilder(true)} style={{ marginBottom: 16 }}>
-            + Create Workout Plan
-          </button>
-          <ul>
-            {workouts.map(w => (
-              <li key={w.id}>
-                <span>{w.title} — {w.scheduled_at?.slice(0,10)}</span>
-              </li>
-            ))}
-            {workouts.length === 0 && <div className="small">No workouts yet. Click "Create Workout Plan" to get started.</div>}
-          </ul>
+          <h3 style={{ color: '#FFB82B' }}>💪 Workout Plans</h3>
+          
+          <div style={{ marginBottom: 24 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <h4 style={{ margin: 0 }}>📋 Trainer-Assigned Workouts</h4>
+              <button className="btn-primary" onClick={() => setShowWorkoutBuilder(true)}>
+                + Assign New Workout
+              </button>
+            </div>
+            <div style={{ background: '#2a2f42', padding: 16, borderRadius: 8 }}>
+              <ul style={{ margin: 0 }}>
+                {workouts.filter(w => w.assigned_by_trainer !== false).map(w => (
+                  <li key={w.id}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <strong>{w.title}</strong>
+                        <div className="small" style={{ opacity: 0.7 }}>
+                          Scheduled: {w.scheduled_at?.slice(0,10)}
+                        </div>
+                      </div>
+                      <div style={{ 
+                        padding: '4px 12px', 
+                        borderRadius: 20, 
+                        background: '#FFB82B33',
+                        color: '#FFB82B',
+                        fontSize: 12
+                      }}>
+                        Trainer Plan
+                      </div>
+                    </div>
+                  </li>
+                ))}
+                {workouts.filter(w => w.assigned_by_trainer !== false).length === 0 && (
+                  <div className="small" style={{ opacity: 0.7 }}>
+                    No trainer-assigned workouts yet. Click "Assign New Workout" to create a plan.
+                  </div>
+                )}
+              </ul>
+            </div>
+          </div>
+
+          <div>
+            <h4 style={{ margin: 0, marginBottom: 12, color: '#1BB55C' }}>📝 Client-Logged Workouts</h4>
+            <div style={{ background: '#2a2f42', padding: 16, borderRadius: 8, opacity: 0.9 }}>
+              <div className="small" style={{ marginBottom: 8, opacity: 0.8 }}>
+                These are workouts that {client.name} logged on their own, separate from your assigned plans.
+              </div>
+              <ul style={{ margin: 0 }}>
+                {workouts.filter(w => w.assigned_by_trainer === false).map(w => (
+                  <li key={w.id}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <strong>{w.title}</strong>
+                        <div className="small" style={{ opacity: 0.7 }}>
+                          Completed: {w.scheduled_at?.slice(0,10)}
+                        </div>
+                      </div>
+                      <div style={{ 
+                        padding: '4px 12px', 
+                        borderRadius: 20, 
+                        background: '#1BB55C33',
+                        color: '#1BB55C',
+                        fontSize: 12
+                      }}>
+                        Client Logged
+                      </div>
+                    </div>
+                  </li>
+                ))}
+                {workouts.filter(w => w.assigned_by_trainer === false).length === 0 && (
+                  <div className="small" style={{ opacity: 0.7 }}>
+                    No client-logged workouts yet.
+                  </div>
+                )}
+              </ul>
+            </div>
+          </div>
         </div>
       )}
 
       {activeTab === 'meals' && (
         <div style={{ marginTop: 16 }}>
-          <button className="btn-primary" onClick={() => setShowMealBuilder(true)} style={{ marginBottom: 16 }}>
-            + Create Meal Plan
-          </button>
-          <ul>
-            {meals.map(meal => (
-              <li key={meal.id}>
-                <span>{meal.date?.slice(0,10)} — {meal.name} • {meal.total_nutrients?.calories ?? 0} kcal</span>
-              </li>
-            ))}
-            {meals.length === 0 && <div className="small">No meals yet. Click "Create Meal Plan" to get started.</div>}
-          </ul>
+          <h3 style={{ color: '#FFB82B' }}>🍽️ Meal Plans</h3>
+          
+          <div style={{ marginBottom: 24 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <h4 style={{ margin: 0 }}>📋 Trainer-Assigned Meal Plans</h4>
+              <button className="btn-primary" onClick={() => setShowMealBuilder(true)}>
+                + Assign New Meal Plan
+              </button>
+            </div>
+            <div style={{ background: '#2a2f42', padding: 16, borderRadius: 8 }}>
+              <ul style={{ margin: 0 }}>
+                {meals.filter(m => m.assigned_by_trainer !== false).map(meal => (
+                  <li key={meal.id}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <strong>{meal.name}</strong>
+                        <div className="small" style={{ opacity: 0.7 }}>
+                          {meal.date?.slice(0,10)} • {meal.total_nutrients?.calories ?? 0} kcal
+                        </div>
+                      </div>
+                      <div style={{ 
+                        padding: '4px 12px', 
+                        borderRadius: 20, 
+                        background: '#FFB82B33',
+                        color: '#FFB82B',
+                        fontSize: 12
+                      }}>
+                        Trainer Plan
+                      </div>
+                    </div>
+                  </li>
+                ))}
+                {meals.filter(m => m.assigned_by_trainer !== false).length === 0 && (
+                  <div className="small" style={{ opacity: 0.7 }}>
+                    No trainer-assigned meal plans yet. Click "Assign New Meal Plan" to create nutrition guidance.
+                  </div>
+                )}
+              </ul>
+            </div>
+          </div>
+
+          <div>
+            <h4 style={{ margin: 0, marginBottom: 12, color: '#1BB55C' }}>📝 Client-Logged Meals</h4>
+            <div style={{ background: '#2a2f42', padding: 16, borderRadius: 8, opacity: 0.9 }}>
+              <div className="small" style={{ marginBottom: 8, opacity: 0.8 }}>
+                These are meals that {client.name} logged on their own, separate from your assigned plans.
+              </div>
+              <ul style={{ margin: 0 }}>
+                {meals.filter(m => m.assigned_by_trainer === false).map(meal => (
+                  <li key={meal.id}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <strong>{meal.name}</strong>
+                        <div className="small" style={{ opacity: 0.7 }}>
+                          {meal.date?.slice(0,10)} • {meal.total_nutrients?.calories ?? 0} kcal
+                        </div>
+                      </div>
+                      <div style={{ 
+                        padding: '4px 12px', 
+                        borderRadius: 20, 
+                        background: '#1BB55C33',
+                        color: '#1BB55C',
+                        fontSize: 12
+                      }}>
+                        Client Logged
+                      </div>
+                    </div>
+                  </li>
+                ))}
+                {meals.filter(m => m.assigned_by_trainer === false).length === 0 && (
+                  <div className="small" style={{ opacity: 0.7 }}>
+                    No client-logged meals yet.
+                  </div>
+                )}
+              </ul>
+            </div>
+          </div>
         </div>
       )}
 
@@ -572,6 +937,30 @@ export function ClientProfile({ client, apiBase, onBack, onEmail, onShare }) {
               ))}
             </ul>
           )}
+        </div>
+      )}
+
+      {activeTab === 'chat' && (
+        <div style={{ marginTop: 16 }}>
+          <ChatTab client={client} apiBase={apiBase} />
+        </div>
+      )}
+
+      {activeTab === 'video' && (
+        <div style={{ marginTop: 16 }}>
+          <VideoCallTab client={client} apiBase={apiBase} />
+        </div>
+      )}
+
+      {activeTab === 'quests' && (
+        <div style={{ marginTop: 16 }}>
+          <QuestTab client={client} apiBase={apiBase} />
+        </div>
+      )}
+
+      {activeTab === 'demographics' && (
+        <div style={{ marginTop: 16 }}>
+          <DemographicsTab client={client} apiBase={apiBase} />
         </div>
       )}
     </div>
