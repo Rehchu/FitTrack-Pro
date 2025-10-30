@@ -33,8 +33,9 @@ function App() {
     if (trainerConfig?.workerUrl) {
       return `${trainerConfig.workerUrl}/api`;
     }
-    // Prefer IPv4 loopback to avoid ::1 resolution issues on Windows
-    return 'http://127.0.0.1:8000';
+    // Default to Cloudflare Worker (free tier, globally distributed, always available)
+    // Worker proxies requests to local backend via Cloudflare Tunnel
+    return 'https://fittrack-pro-desktop.rehchu1.workers.dev/api';
   }, [trainerConfig]);
 
   useEffect(() => {
@@ -92,7 +93,7 @@ function App() {
   }
 
   async function fetchClients(config = trainerConfig) {
-    const base = config?.workerUrl ? `${config.workerUrl}/api` : 'http://127.0.0.1:8000';
+    const base = config?.workerUrl ? `${config.workerUrl}/api` : 'https://fittrack-pro-desktop.rehchu1.workers.dev/api';
     try {
       const response = await fetch(`${base}/clients`);
       const data = await response.json();
@@ -134,7 +135,7 @@ function App() {
       setNewEmail('');
       fetchClients();
     } catch (err) {
-      alert('Unable to create client. Make sure the backend is running on 127.0.0.1:8000.\n\nDetails: ' + err.message);
+      alert('Unable to create client. Please check your internet connection.\n\nDetails: ' + err.message);
       console.error('Create client failed:', err);
     }
   }
