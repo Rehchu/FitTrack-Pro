@@ -1,9 +1,13 @@
 # Cloudflare Pages Build Configuration
-# This file tells Cloudflare Pages how to build from the correct directory
+# This file tells Cloudflare Pages to deploy the Worker from the correct directory
 
+# Build settings
 [build]
-  command = "cd integrations/cloudflare && npx wrangler deploy"
-  publish = "integrations/cloudflare"
+  # Change to the Worker directory and deploy
+  command = "npx wrangler deploy"
+  # Root directory containing wrangler.toml
+  base = "integrations/cloudflare"
 
+# Environment variables
 [build.environment]
-  NODE_VERSION = "20"
+  NODE_VERSION = "20.18.0"
