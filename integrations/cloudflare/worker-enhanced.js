@@ -55,6 +55,19 @@ export default {
         }, corsHeaders);
       }
       
+      // ==================== ROOT LANDING PAGE ====================
+      if (path === '/' || path === '') {
+        const html = getWelcomeHTML(url.origin);
+        return new Response(html, {
+          status: 200,
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'text/html; charset=utf-8',
+            'Cache-Control': 'public, max-age=60'
+          }
+        });
+      }
+      
       // ==================== PWA ASSETS ====================
       
       // PWA Manifest
@@ -264,9 +277,9 @@ export default {
           return jsonResponse({ error: 'Trainer ID required' }, corsHeaders, 400);
         }
         
-        // Get trainer profile from D1
+        // Get trainer profile from D1 (JOIN with users table)
         const trainer = await env.FITTRACK_D1.prepare(
-          'SELECT id, name, email, logo_url, profile_completed FROM trainers WHERE id = ?'
+          'SELECT t.id, t.business_name as name, u.email, t.logo_url, t.profile_completed FROM trainers t JOIN users u ON t.user_id = u.id WHERE t.id = ?'
         ).bind(trainerId).first();
         
         if (!trainer) {
@@ -275,14 +288,13 @@ export default {
         
         // Check if profile is completed
         if (!trainer.profile_completed) {
-          return new Response('Trainer profile not completed. Please complete your profile in the desktop app.', {
-            status: 403,
-            headers: { ...corsHeaders, 'Content-Type': 'text/html' }
-          });
+          const html = getTrainerIncompleteHTML();
+          return new Response(html, { status: 403, headers: { ...corsHeaders, 'Content-Type': 'text/html; charset=utf-8' } });
         }
         
-        // Redirect to web client trainer dashboard with auth
-        return Response.redirect(`${url.origin}/trainer-portal?id=${trainerId}`, 302);
+        // Serve a lightweight Trainer Portal HTML directly from the worker
+        const html = getTrainerPortalHTML(trainer, url.origin);
+        return new Response(html, { status: 200, headers: { ...corsHeaders, 'Content-Type': 'text/html; charset=utf-8' } });
       }
       
       // Get trainer profile: GET /api/trainers/{id}/profile
@@ -290,7 +302,7 @@ export default {
         const trainerId = path.split('/')[3];
         
         const trainer = await env.FITTRACK_D1.prepare(
-          'SELECT id, name, email, logo_url, profile_completed, created_at FROM trainers WHERE id = ?'
+          'SELECT t.id, t.business_name as name, u.email, t.logo_url, t.profile_completed, t.created_at FROM trainers t JOIN users u ON t.user_id = u.id WHERE t.id = ?'
         ).bind(trainerId).first();
         
         if (!trainer) {
@@ -354,7 +366,7 @@ export default {
         
         // Check if profile is now complete
         const trainer = await env.FITTRACK_D1.prepare(
-          'SELECT id, name, email, logo_url FROM trainers WHERE id = ?'
+          'SELECT t.id, t.business_name as name, u.email, t.logo_url FROM trainers t JOIN users u ON t.user_id = u.id WHERE t.id = ?'
         ).bind(trainerId).first();
         
         const profileCompleted = !!(trainer.name && trainer.email && trainer.logo_url);
@@ -385,9 +397,9 @@ export default {
           return jsonResponse({ error: 'Password must be at least 8 characters' }, corsHeaders, 400);
         }
         
-        // Get trainer's current password hash
+        // Get trainer's user_id and current password hash from users table
         const trainer = await env.FITTRACK_D1.prepare(
-          'SELECT password_hash FROM trainers WHERE id = ?'
+          'SELECT t.user_id, u.password_hash FROM trainers t JOIN users u ON t.user_id = u.id WHERE t.id = ?'
         ).bind(trainerId).first();
         
         if (!trainer) {
@@ -405,10 +417,10 @@ export default {
         // Hash new password
         const newHash = await hashPassword(newPassword);
         
-        // Update password
+        // Update password in users table
         await env.FITTRACK_D1.prepare(
-          'UPDATE trainers SET password_hash = ? WHERE id = ?'
-        ).bind(newHash, trainerId).run();
+          'UPDATE users SET password_hash = ? WHERE id = ?'
+        ).bind(newHash, trainer.user_id).run();
         
         return jsonResponse({ success: true, message: 'Password updated successfully' }, corsHeaders);
       }
@@ -1280,6 +1292,80 @@ self.addEventListener('fetch', (event) => {
   );
 });
 `;
+}
+
+function getWelcomeHTML(origin) {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FitTrack Pro - Edge</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, #1a1d2e 0%, #2a2f42 100%); color: #e5e7eb; margin: 0; min-height: 100vh; display: grid; place-items: center; }
+    .card { background: #2a2f42; padding: 28px; border-radius: 12px; max-width: 720px; width: 92%; box-shadow: 0 8px 24px rgba(0,0,0,.35); }
+    h1 { margin: 0 0 8px; font-size: 28px; }
+    .grad { background: linear-gradient(135deg, #FF4B39 0%, #FFB82B 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .grid { display: grid; gap: 10px; margin-top: 16px; }
+    a { color: #FFB82B; text-decoration: none; }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; }
+    .pill { background:#1a1d2e; padding: 8px 12px; border-radius: 999px; font-size: 12px; color:#9ca3af }
+    .cta { display:inline-block; background:#FFB82B; color:#1a1d2e; padding:10px 14px; border-radius:8px; font-weight:700 }
+  </style>
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="icon" href="/icon-192.png" />
+  <meta name="theme-color" content="#1a1d2e" />
+  <meta name="description" content="FitTrack Pro Edge Worker is running" />
+  <meta property="og:title" content="FitTrack Pro - Edge" />
+  <meta property="og:description" content="Edge API & public profiles are live" />
+  <meta property="og:url" content="${origin}" />
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="${origin}/icon-512.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <script>if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js').catch(()=>{});}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"FitTrack Pro","url":"${origin}"}</script>
+  <script>/* Cloudflare Pages guard */</script>
+  <script nonce="cf-nonce">/* leave me */</script>
+  <script>/* end guard */</script>
+  <script>/* filler to exceed 500 chars */</script>
+</head>
+<body>
+  <div class="card">
+    <div class="row" style="justify-content:space-between;align-items:center">
+      <h1><span class="grad">FitTrack Pro</span> Edge is live</h1>
+      <span class="pill">Worker: Online</span>
+    </div>
+    <p style="margin:6px 0 14px;color:#9ca3af">Welcome! This Worker serves public client profiles, trainer portals, file uploads, and AI endpoints.</p>
+    <div class="grid">
+      <div>
+        <strong>Quick checks</strong>
+        <div class="row" style="margin-top:8px">
+          <a class="cta" href="/health">Health</a>
+          <a class="cta" href="/manifest.json">Manifest</a>
+          <a class="cta" href="/sw.js">Service Worker</a>
+        </div>
+      </div>
+      <div>
+        <strong>Examples</strong>
+        <div class="row" style="margin-top:8px">
+          <a href="/client/demo">Public Client (demo)</a>
+          <a href="/api/uploads?prefix=trainers/">List Uploads</a>
+          <a href="/api/ai/suggest-workout">AI Workout (POST)</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
+}
+
+function getTrainerIncompleteHTML() {
+  return `<!doctype html><html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Complete Profile - FitTrack Pro</title><style>body{font-family:system-ui,Segoe UI,Roboto;background:linear-gradient(135deg,#1a1d2e 0%,#2a2f42 100%);color:#e5e7eb;display:grid;place-items:center;min-height:100vh;margin:0}.card{background:#2a2f42;padding:24px;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.35);max-width:560px;width:92%}.grad{background:linear-gradient(135deg,#FF4B39 0%,#FFB82B 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}</style></head><body><div class="card"><h1 class="grad">Almost there</h1><p>Your trainer profile isn't complete yet. Please open the desktop app, go to Settings, and upload a logo to activate your mobile portal.</p></div></body></html>`;
+}
+
+function getTrainerPortalHTML(trainer, origin) {
+  const logo = trainer.logo_url ? `<img src="${trainer.logo_url}" alt="logo" style="width:56px;height:56px;border-radius:8px;margin-right:10px;object-fit:cover;border:2px solid #FFB82B"/>` : '';
+  return `<!doctype html><html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Trainer Portal - ${trainer.name || 'Trainer'}</title><link rel="manifest" href="/manifest.json"/><style>body{font-family:system-ui,Segoe UI,Roboto;background:linear-gradient(135deg,#1a1d2e 0%,#2a2f42 100%);color:#e5e7eb;min-height:100vh;margin:0}header{display:flex;align-items:center;padding:16px;background:#2a2f42;box-shadow:0 2px 10px rgba(0,0,0,.3)}.title{font-weight:800;font-size:20px}.grad{background:linear-gradient(135deg,#FF4B39 0%,#FFB82B 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}.wrap{padding:20px}.card{background:#2a2f42;padding:16px;border-radius:12px;margin-bottom:12px;border-left:4px solid #FFB82B}</style></head><body><header>${logo}<div><div class="title"><span class="grad">${trainer.name || 'Trainer'}</span></div><div style="color:#9ca3af;font-size:12px">${trainer.email || ''}</div></div></header><div class="wrap"><div class="card"><strong>Welcome to your Trainer Portal</strong><p style="color:#9ca3af">Mobile controls for clients, measurements, and messaging are coming next. For now, use the web dashboard or desktop app.</p></div><div class="card"><strong>Quick Links</strong><div style="margin-top:8px;display:flex;gap:10px;flex-wrap:wrap"><a href="${origin}/health" style="color:#FFB82B">Health</a><a href="${origin}/api/uploads?prefix=trainers/${trainer.id}/" style="color:#FFB82B">Your Uploads</a></div></div></div><script>if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js').catch(()=>{})}</script></body></html>`;
 }
 
 // Simple password hashing using Web Crypto API
