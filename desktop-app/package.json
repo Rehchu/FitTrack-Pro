@@ -17,13 +17,13 @@
     "appId": "com.fittrackpro.app",
     "productName": "FitTrack Pro",
     "directories": {
-      "output": "dist-new",
+      "output": "build-output",
       "buildResources": "build"
     },
     "files": [
       "src/**/*",
-      "dist-new/index.html",
-      "dist-new/assets/**/*",
+      "dist/index.html",
+      "dist/assets/**/*",
       "node_modules/**/*"
     ],
     "asarUnpack": [
@@ -36,9 +36,7 @@
       }
     ],
     "win": {
-      "target": [
-        "nsis"
-      ],
+      "target": ["nsis"],
       "icon": "build/icon.ico"
     },
     "nsis": {
@@ -52,9 +50,8 @@
   "dependencies": {
     "axios": "^1.6.0",
     "bcrypt": "^5.1.1",
-    "electron-store": "^8.1.0",
     "lottie-react": "^2.4.0",
-    "qrcode": "^1.5.4",
+    "electron-store": "^8.1.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
@@ -66,3 +63,5 @@
     "vite": "^5.0.0"
   }
 }
+
+

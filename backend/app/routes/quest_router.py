@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 from typing import List
 from ..database import get_db
-from ..models import Quest, Milestone, Achievement, Client, Measurement, Meal
+from ..models import Quest, Milestone, Achievement, Client, Measurement, Meal, Workout, Setgroup, WorkoutSet
 from pydantic import BaseModel
 
 router = APIRouter(prefix="/quests", tags=["quests"])
@@ -449,6 +449,60 @@ def auto_check_milestones(client_id: int, db: Session = Depends(get_db)):
     
     total_photos = sum(len(m.photos) if m.photos else 0 for m in measurements)
     measurement_count = len(measurements)
+
+    # ================= WORKOUT-BASED METRICS =================
+    completed_workouts = db.query(Workout).filter(Workout.client_id == client_id, Workout.completed_at.isnot(None))\
+        .order_by(Workout.completed_at).all()
+    total_workouts = len(completed_workouts)
+
+    # Total duration minutes and volume across all completed workouts
+    total_duration_minutes = sum([w.duration_minutes for w in completed_workouts if w.duration_minutes] or [0])
+    total_volume = 0
+    for w in completed_workouts:
+        # models provide total_volume property
+        try:
+            total_volume += w.total_volume or 0
+        except Exception:
+            # Fallback: compute from sets if relationship not loaded
+            sgs = db.query(Setgroup).filter(Setgroup.workout_id == w.id).all()
+            for sg in sgs:
+                sets = db.query(WorkoutSet).filter(WorkoutSet.setgroup_id == sg.id).all()
+                for s in sets:
+                    if s.reps and s.weight:
+                        total_volume += (s.reps * s.weight)
+
+    # Weekly streak: consecutive calendar weeks with at least one workout, ending in the most recent week with activity
+    from collections import defaultdict
+    weeks_with_workout = defaultdict(int)
+    for w in completed_workouts:
+        d = w.completed_at.date()
+        year, week, _ = d.isocalendar()
+        weeks_with_workout[(year, week)] = 1
+
+    sorted_weeks = sorted(weeks_with_workout.keys())
+    workout_streak_weeks = 0
+    if sorted_weeks:
+        # Count consecutive weeks from the last one backwards
+        last_year, last_week = sorted_weeks[-1]
+        workout_streak_weeks = 1
+        i = len(sorted_weeks) - 2
+        while i >= 0:
+            y, wk = sorted_weeks[i]
+            # Determine expected previous week
+            exp_year, exp_week = last_year, last_week - 1
+            if exp_week == 0:
+                # ISO week 0 means wrap to last ISO week of previous year (assume 52 or 53)
+                exp_year -= 1
+                # compute last ISO week of previous year
+                import datetime as _dt
+                dec28 = _dt.date(exp_year, 12, 28)
+                exp_week = dec28.isocalendar()[1]
+            if (y, wk) == (exp_year, exp_week):
+                workout_streak_weeks += 1
+                last_year, last_week = y, wk
+                i -= 1
+            else:
+                break
     
     # ========== CREATE MILESTONES ==========
     
@@ -542,6 +596,50 @@ def auto_check_milestones(client_id: int, db: Session = Depends(get_db)):
                 "📊",
                 f"📊 Data master! {count} measurements tracked!"
             )
+
+    # Workout count milestones
+    for wcount in [5, 10, 20, 30, 50, 100]:
+        if total_workouts >= wcount:
+            create_milestone_if_new(
+                "workout_count", wcount,
+                f"{wcount} Workouts Completed!",
+                f"Consistency pays off! You've completed {wcount} workouts.",
+                "🏋️",
+                f"🏋️ Fantastic! {wcount} workouts done!"
+            )
+
+    # Workout streak milestones (weeks)
+    for wks in [2, 4, 8, 12, 16, 24]:
+        if workout_streak_weeks >= wks:
+            create_milestone_if_new(
+                "workout_streak_weeks", wks,
+                f"{wks}-Week Workout Streak!",
+                f"Unstoppable! {wks} consecutive weeks with workouts.",
+                "🔥",
+                f"🔥 You're on fire! {wks} weeks in a row!"
+            )
+
+    # Total training volume milestones (kg)
+    for vol in [10000, 50000, 100000, 250000, 500000]:
+        if total_volume >= vol:
+            create_milestone_if_new(
+                "training_volume", vol,
+                f"{vol:,} kg Total Volume!",
+                f"Strength rising! You've lifted a cumulative {vol:,} kg.",
+                "💪",
+                f"💪 Massive! {vol:,} kg total lifted!"
+            )
+
+    # Training duration milestones (minutes)
+    for mins in [500, 1000, 2500, 5000, 10000]:
+        if total_duration_minutes >= mins:
+            create_milestone_if_new(
+                "training_duration", mins,
+                f"{mins:,} Minutes Trained!",
+                f"Time under tension! {mins:,} minutes of training completed.",
+                "⏱️",
+                f"⏱️ Grind mode! {mins:,} minutes logged!"
+            )
     
     # ========== UPDATE ACTIVE QUESTS ==========
     active_quests = db.query(Quest).filter(
@@ -561,6 +659,14 @@ def auto_check_milestones(client_id: int, db: Session = Depends(get_db)):
             quest.current_value = streak_count
         elif quest.quest_type == "photo_count":
             quest.current_value = total_photos
+        elif quest.quest_type == "workout_count":
+            quest.current_value = total_workouts
+        elif quest.quest_type == "training_volume":
+            quest.current_value = total_volume
+        elif quest.quest_type == "training_duration":
+            quest.current_value = total_duration_minutes
+        elif quest.quest_type == "workout_streak_weeks":
+            quest.current_value = workout_streak_weeks
         
         # Check completion
         if quest.target_value and quest.current_value >= quest.target_value:
@@ -602,6 +708,10 @@ def auto_check_milestones(client_id: int, db: Session = Depends(get_db)):
             "waist_lost": round(waist_lost, 1),
             "current_streak": streak_count,
             "total_photos": total_photos,
-            "total_measurements": measurement_count
+            "total_measurements": measurement_count,
+            "total_workouts": total_workouts,
+            "workout_streak_weeks": workout_streak_weeks,
+            "total_training_volume": int(total_volume),
+            "total_training_minutes": int(total_duration_minutes)
         }
     }

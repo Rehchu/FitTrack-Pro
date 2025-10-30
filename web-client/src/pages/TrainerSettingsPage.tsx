@@ -14,7 +14,8 @@ import {
   Divider,
   Grid,
   Card,
-  CardContent
+  CardContent,
+  CardMedia
 } from '@mui/material';
 import {
   Visibility,
@@ -22,15 +23,14 @@ import {
   CloudUpload,
   Save,
   QrCode2,
-  ContentCopy
+  ContentCopy,
+  Download
 } from '@mui/icons-material';
-import { useAuthStore } from '../stores/authStore';
 
 const TRAINER_ID = 1; // For production testing
 const API_BASE = 'https://fittrack-pro-desktop.rehchu1.workers.dev/api';
 
-export function SettingsPage() {
-  const { user } = useAuthStore();
+export function TrainerSettingsPage() {
   const [qrCodeUrl, setQrCodeUrl] = useState('');
   const [profileUrl, setProfileUrl] = useState('');
   const [logo, setLogo] = useState<File | null>(null);
@@ -42,7 +42,11 @@ export function SettingsPage() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
+  const [snackbar, setSnackbar] = useState({ 
+    open: false, 
+    message: '', 
+    severity: 'success' as 'success' | 'error' 
+  });
 
   useEffect(() => {
     // Generate QR code and profile URL on mount
@@ -60,6 +64,15 @@ export function SettingsPage() {
     }).catch(() => {
       setSnackbar({ open: true, message: 'Failed to copy', severity: 'error' });
     });
+  };
+
+  const downloadQRCode = () => {
+    const link = document.createElement('a');
+    link.href = qrCodeUrl;
+    link.download = `trainer-${TRAINER_ID}-qr-code.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const handleLogoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -108,14 +121,13 @@ export function SettingsPage() {
       );
 
       if (!response.ok) {
-        throw new Error('Failed to upload logo');
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to upload logo');
       }
 
       const data = await response.json();
-      setSnackbar({ open: true, message: 'Logo updated successfully!', severity: 'success' });
-      
-      // Update user in store if needed
-      // authStore.updateUser({ logo_url: data.logo_url });
+      setSnackbar({ open: true, message: 'Logo uploaded successfully! ✅', severity: 'success' });
+      setLogo(null);
     } catch (error) {
       setSnackbar({ 
         open: true, 
@@ -147,12 +159,11 @@ export function SettingsPage() {
     setLoading(true);
     try {
       const response = await fetch(
-        `https://fittrack-pro-desktop.rehchu1.workers.dev/api/trainers/${user?.id}/password`,
+        `${API_BASE}/trainers/${TRAINER_ID}/password`,
         {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
           },
           body: JSON.stringify({
             currentPassword,
@@ -166,7 +177,7 @@ export function SettingsPage() {
         throw new Error(error.error || 'Failed to change password');
       }
 
-      setSnackbar({ open: true, message: 'Password changed successfully!', severity: 'success' });
+      setSnackbar({ open: true, message: 'Password changed successfully! ✅', severity: 'success' });
       
       // Clear form
       setCurrentPassword('');
@@ -186,13 +197,72 @@ export function SettingsPage() {
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       <Typography variant="h4" gutterBottom sx={{ mb: 4, fontWeight: 'bold' }}>
-        Settings
+        Trainer Settings
       </Typography>
 
       <Grid container spacing={3}>
+        {/* QR Code Section */}
+        <Grid item xs={12} md={6}>
+          <Paper sx={{ p: 3, height: '100%' }}>
+            <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <QrCode2 /> Mobile Portal QR Code
+            </Typography>
+            <Divider sx={{ my: 2 }} />
+
+            <Box sx={{ textAlign: 'center' }}>
+              {qrCodeUrl && (
+                <Card sx={{ maxWidth: 320, mx: 'auto', mb: 3 }}>
+                  <CardMedia
+                    component="img"
+                    image={qrCodeUrl}
+                    alt="Trainer Portal QR Code"
+                    sx={{ p: 2 }}
+                  />
+                  <CardContent>
+                    <Typography variant="caption" color="text.secondary" display="block" gutterBottom>
+                      Scan this code with a mobile device
+                    </Typography>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      startIcon={<Download />}
+                      onClick={downloadQRCode}
+                      fullWidth
+                    >
+                      Download QR Code
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+
+              <TextField
+                fullWidth
+                label="Your Portal URL"
+                value={profileUrl}
+                InputProps={{
+                  readOnly: true,
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton onClick={() => copyToClipboard(profileUrl)} edge="end">
+                        <ContentCopy />
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
+                sx={{ mb: 2 }}
+              />
+
+              <Alert severity="info" sx={{ textAlign: 'left' }}>
+                Share this QR code or URL with clients to give them access to your mobile portal.
+                Works globally via Cloudflare edge network!
+              </Alert>
+            </Box>
+          </Paper>
+        </Grid>
+
         {/* Logo Upload Section */}
         <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 3 }}>
+          <Paper sx={{ p: 3, height: '100%' }}>
             <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <CloudUpload /> Logo Upload
             </Typography>
@@ -200,7 +270,7 @@ export function SettingsPage() {
 
             <Box sx={{ textAlign: 'center', mb: 3 }}>
               <Avatar
-             src={logoPreview || undefined}
+                src={logoPreview || undefined}
                 sx={{
                   width: 150,
                   height: 150,
@@ -210,7 +280,7 @@ export function SettingsPage() {
                   borderColor: 'primary.main',
                 }}
               >
-                {user?.name?.charAt(0).toUpperCase()}
+                FT
               </Avatar>
 
               <Button
@@ -228,9 +298,15 @@ export function SettingsPage() {
                 />
               </Button>
 
-              <Typography variant="caption" display="block" color="text.secondary">
+              <Typography variant="caption" display="block" color="text.secondary" sx={{ mb: 2 }}>
                 Maximum file size: 5MB. Supported formats: PNG, JPG, GIF
               </Typography>
+
+              {logo && (
+                <Alert severity="success" sx={{ mb: 2 }}>
+                  Logo selected: {logo.name}
+                </Alert>
+              )}
             </Box>
 
             <Button
@@ -240,130 +316,106 @@ export function SettingsPage() {
               disabled={!logo || loading}
               startIcon={<Save />}
             >
-              Save Logo
+              {loading ? 'Uploading...' : 'Save Logo'}
             </Button>
+
+            <Alert severity="info" sx={{ mt: 2 }}>
+              Logo is optional. Your profile can be completed without it!
+            </Alert>
           </Paper>
         </Grid>
 
         {/* Password Change Section */}
-        <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 3 }}>
-            <Typography variant="h6" gutterBottom>
-              Change Password
-            </Typography>
-            <Divider sx={{ my: 2 }} />
-
-            <TextField
-              fullWidth
-              label="Current Password"
-              type={showCurrentPassword ? 'text' : 'password'}
-              value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
-              sx={{ mb: 2 }}
-              InputProps={{
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <IconButton
-                      onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                      edge="end"
-                    >
-                      {showCurrentPassword ? <VisibilityOff /> : <Visibility />}
-                    </IconButton>
-                  </InputAdornment>
-                ),
-              }}
-            />
-
-            <TextField
-              fullWidth
-              label="New Password"
-              type={showNewPassword ? 'text' : 'password'}
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              sx={{ mb: 2 }}
-              helperText="Must be at least 8 characters"
-              InputProps={{
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <IconButton
-                      onClick={() => setShowNewPassword(!showNewPassword)}
-                      edge="end"
-                    >
-                      {showNewPassword ? <VisibilityOff /> : <Visibility />}
-                    </IconButton>
-                  </InputAdornment>
-                ),
-              }}
-            />
-
-            <TextField
-              fullWidth
-              label="Confirm New Password"
-              type={showConfirmPassword ? 'text' : 'password'}
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              sx={{ mb: 3 }}
-              error={confirmPassword !== '' && newPassword !== confirmPassword}
-              helperText={
-                confirmPassword !== '' && newPassword !== confirmPassword
-                  ? 'Passwords do not match'
-                  : ''
-              }
-              InputProps={{
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <IconButton
-                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      edge="end"
-                    >
-                      {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
-                    </IconButton>
-                  </InputAdornment>
-                ),
-              }}
-            />
-
-            <Button
-              variant="contained"
-              fullWidth
-              onClick={handlePasswordChange}
-              disabled={loading || !currentPassword || !newPassword || !confirmPassword}
-              startIcon={<Save />}
-            >
-              Change Password
-            </Button>
-          </Paper>
-        </Grid>
-
-        {/* Profile Information Section */}
         <Grid item xs={12}>
           <Paper sx={{ p: 3 }}>
             <Typography variant="h6" gutterBottom>
-              Profile Information
+              Change Password
             </Typography>
             <Divider sx={{ my: 2 }} />
 
             <Grid container spacing={2}>
-              <Grid item xs={12} sm={6}>
+              <Grid item xs={12} md={4}>
                 <TextField
                   fullWidth
-                  label="Name"
-                  value={user?.name || ''}
-                  disabled
+                  label="Current Password"
+                  type={showCurrentPassword ? 'text' : 'password'}
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  InputProps={{
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <IconButton
+                          onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                          edge="end"
+                        >
+                          {showCurrentPassword ? <VisibilityOff /> : <Visibility />}
+                        </IconButton>
+                      </InputAdornment>
+                    ),
+                  }}
                 />
               </Grid>
-              <Grid item xs={12} sm={6}>
+
+              <Grid item xs={12} md={4}>
                 <TextField
                   fullWidth
-                  label="Email"
-                  value={user?.email || ''}
-                  disabled
+                  label="New Password"
+                  type={showNewPassword ? 'text' : 'password'}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  helperText="Must be at least 8 characters"
+                  InputProps={{
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <IconButton
+                          onClick={() => setShowNewPassword(!showNewPassword)}
+                          edge="end"
+                        >
+                          {showNewPassword ? <VisibilityOff /> : <Visibility />}
+                        </IconButton>
+                      </InputAdornment>
+                    ),
+                  }}
                 />
               </Grid>
+
+              <Grid item xs={12} md={4}>
+                <TextField
+                  fullWidth
+                  label="Confirm New Password"
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  error={confirmPassword !== '' && newPassword !== confirmPassword}
+                  helperText={
+                    confirmPassword !== '' && newPassword !== confirmPassword
+                      ? 'Passwords do not match'
+                      : ' '
+                  }
+                  InputProps={{
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <IconButton
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          edge="end"
+                        >
+                          {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
+                        </IconButton>
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+              </Grid>
+
               <Grid item xs={12}>
-                <Alert severity="info">
-                  To update your name or email, please contact support.
-                </Alert>
+                <Button
+                  variant="contained"
+                  onClick={handlePasswordChange}
+                  disabled={loading || !currentPassword || !newPassword || !confirmPassword || newPassword !== confirmPassword}
+                  startIcon={<Save />}
+                >
+                  {loading ? 'Changing Password...' : 'Change Password'}
+                </Button>
               </Grid>
             </Grid>
           </Paper>

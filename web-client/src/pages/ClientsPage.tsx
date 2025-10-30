@@ -42,13 +42,14 @@ interface Client {
 }
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'https://fittrack-pro-desktop.rehchu1.workers.dev/api';
+const TRAINER_ID = 1; // For production testing - will be replaced with auth later
 
 export function ClientsPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [openAddDialog, setOpenAddDialog] = useState(false);
-  const [newClient, setNewClient] = useState({ name: '', email: '' });
+  const [newClient, setNewClient] = useState({ name: '', email: '', phone: '' });
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -58,10 +59,11 @@ export function ClientsPage() {
   const loadClients = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${API_BASE}/clients`);
-      setClients(response.data);
+      const response = await axios.get(`${API_BASE}/clients?trainerId=${TRAINER_ID}`);
+      setClients(response.data.clients || []);
     } catch (error) {
       console.error('Failed to load clients:', error);
+      setClients([]);
     } finally {
       setLoading(false);
     }
@@ -69,12 +71,16 @@ export function ClientsPage() {
 
   const handleAddClient = async () => {
     try {
-      await axios.post(`${API_BASE}/clients`, newClient);
+      await axios.post(`${API_BASE}/clients`, {
+        ...newClient,
+        trainerId: TRAINER_ID
+      });
       setOpenAddDialog(false);
-      setNewClient({ name: '', email: '' });
+      setNewClient({ name: '', email: '', phone: '' });
       loadClients();
     } catch (error) {
       console.error('Failed to add client:', error);
+      alert('Failed to add client. Please try again.');
     }
   };
 
@@ -238,6 +244,7 @@ export function ClientsPage() {
             label="Client Name"
             type="text"
             fullWidth
+            required
             value={newClient.name}
             onChange={(e) => setNewClient({ ...newClient, name: e.target.value })}
             sx={{ mb: 2 }}
@@ -247,8 +254,18 @@ export function ClientsPage() {
             label="Email Address"
             type="email"
             fullWidth
+            required
             value={newClient.email}
             onChange={(e) => setNewClient({ ...newClient, email: e.target.value })}
+            sx={{ mb: 2 }}
+          />
+          <TextField
+            margin="dense"
+            label="Phone Number (optional)"
+            type="tel"
+            fullWidth
+            value={newClient.phone}
+            onChange={(e) => setNewClient({ ...newClient, phone: e.target.value })}
           />
         </DialogContent>
         <DialogActions>

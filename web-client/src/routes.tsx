@@ -4,6 +4,7 @@ import { Login } from './pages/Login';
 import { MeasurementPage } from './pages/MeasurementPage';
 import { MealPlanPage } from './pages/MealPlanPage';
 import { PublicProfilePage } from './pages/PublicProfilePage';
+import { TrainerSettingsPage } from './pages/TrainerSettingsPage';
 import { CalendarPage } from './pages/CalendarPage';
 import { ClientsPage } from './pages/ClientsPage';
 import { ClientDetailPage } from './pages/ClientDetailPage';
@@ -35,6 +36,7 @@ export function AppRoutes() {
       <Route path="/clients/:clientId/measurements" element={<RequireAuth><MeasurementPage isTrainer={true} /></RequireAuth>} />
       <Route path="/clients/:clientId/meals" element={<RequireAuth><MealPlanPage /></RequireAuth>} />
       <Route path="/settings" element={<RequireAuth><SettingsPage /></RequireAuth>} />
+      <Route path="/trainer-settings" element={<RequireAuth><TrainerSettingsPage /></RequireAuth>} />
       
       {/* Public routes - no auth required */}
       <Route path="/profile/:token" element={<PublicProfilePage />} />
