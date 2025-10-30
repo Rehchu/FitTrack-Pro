@@ -165,27 +165,75 @@ if (!$SkipVSCodeExtensions -and (Get-Command code -ErrorAction SilentlyContinue)
     Write-Host "🔌 Installing VS Code Extensions..." -ForegroundColor Cyan
     
     $extensions = @(
+        # Core Development
         "ms-python.python",
         "ms-python.vscode-pylance",
+        "ms-python.debugpy",
+        "ms-python.vscode-python-envs",
         "dbaeumer.vscode-eslint",
         "esbenp.prettier-vscode",
-        "ms-vscode.vscode-typescript-next",
-        "ms-azuretools.vscode-docker",
+        "rvest.vs-code-prettier-eslint",
+        "ms-vscode.powershell",
+        
+        # GitHub & Git
         "GitHub.copilot",
         "GitHub.copilot-chat",
-        "ms-vscode-remote.remote-containers",
-        "cloudflare.cloudflare"
+        "github.vscode-github-actions",
+        "eamodio.gitlens",
+        
+        # Cloudflare
+        "cloudflare.cloudflare-workers-bindings-extension",
+        "alessandrobenassi.cloudflare-devtools",
+        "jaaxxx.cloudflare-vscode-devtools",
+        "codiium.wrangler",
+        "ivanarjona.cloudflaretunnel",
+        "swalkerdev.cloudflare-kv-explorer",
+        "yawarjamal.cf-d1",
+        
+        # React & Frontend
+        "andrewmcgoveran.react-component-generator",
+        "msjsdiag.vscode-react-native",
+        "bradlc.vscode-tailwindcss",
+        "antfu.vite",
+        
+        # Node.js & NPM
+        "christian-kohler.npm-intellisense",
+        "leizongmin.node-module-intellisense",
+        "orelhassid.npm-install",
+        
+        # Docker & Containers
+        "ms-azuretools.vscode-containers",
+        
+        # Databases & Storage
+        "prisma.prisma",
+        "lvdn.s3x-explorer",
+        "azydeco.image-storage-explorer",
+        
+        # Electron
+        "dsanders11.vscode-electron-build-tools",
+        "google.vscode-mojom",
+        "npclaudiu.vscode-gn",
+        
+        # Utilities
+        "antfu.browse-lite",
+        "davidanson.vscode-markdownlint",
+        "oakessoftware.headers",
+        "mindaro-dev.file-downloader",
+        "nolindnaidoo.scrape-le",
+        "ms-playwright.playwright"
     )
     
     foreach ($ext in $extensions) {
         $installed = code --list-extensions | Select-String -Pattern "^$ext$"
         if (!$installed) {
             Write-Host "  Installing $ext..." -ForegroundColor Yellow
-            code --install-extension $ext --force
+            code --install-extension $ext --force 2>&1 | Out-Null
         } else {
             Write-Host "  ✅ $ext already installed" -ForegroundColor Green
         }
     }
+    
+    Write-Host "✅ All VS Code extensions installed" -ForegroundColor Green
 }
 
 # Step 8: Set up Python virtual environment
