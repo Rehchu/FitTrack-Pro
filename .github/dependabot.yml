@@ -1,0 +1,87 @@
+# Dependabot configuration for automatic dependency updates
+# Updates npm dependencies in multiple package.json locations
+
+version: 2
+updates:
+  # Update Cloudflare Worker dependencies
+  - package-ecosystem: "npm"
+    directory: "/integrations/cloudflare"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "Rehchu"
+    labels:
+      - "dependencies"
+      - "cloudflare"
+    commit-message:
+      prefix: "chore(worker)"
+      include: "scope"
+    
+  # Update Desktop App dependencies
+  - package-ecosystem: "npm"
+    directory: "/desktop-app"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "Rehchu"
+    labels:
+      - "dependencies"
+      - "desktop-app"
+    commit-message:
+      prefix: "chore(desktop)"
+      include: "scope"
+    
+  # Update Web Client dependencies
+  - package-ecosystem: "npm"
+    directory: "/web-client"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "Rehchu"
+    labels:
+      - "dependencies"
+      - "web-client"
+    commit-message:
+      prefix: "chore(web)"
+      include: "scope"
+    
+  # Update Python Backend dependencies
+  - package-ecosystem: "pip"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "Rehchu"
+    labels:
+      - "dependencies"
+      - "backend"
+    commit-message:
+      prefix: "chore(backend)"
+      include: "scope"
+    
+  # Update GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 3
+    reviewers:
+      - "Rehchu"
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "chore(ci)"
+      include: "scope"
