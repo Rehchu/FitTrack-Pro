@@ -1,0 +1,67 @@
+{
+  "name": "fittrack-pro",
+  "productName": "FitTrack Pro",
+  "version": "1.1.0",
+  "description": "Professional fitness tracking software for personal trainers",
+  "author": "FitTrack Pro",
+  "private": true,
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "concurrently \"vite --config ./src/renderer/vite.config.js\" \"electron .\"",
+    "build": "vite build --config ./src/renderer/vite.config.js",
+    "pack": "npm run build && electron-builder --dir",
+    "dist": "npm run build && electron-builder"
+  },
+  "build": {
+    "appId": "com.fittrackpro.app",
+    "productName": "FitTrack Pro",
+    "directories": {
+      "output": "dist-new",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "dist-new/index.html",
+      "dist-new/assets/**/*",
+      "node_modules/**/*"
+    ],
+    "asarUnpack": [
+      "node_modules/bcrypt/**"
+    ],
+    "extraResources": [
+      {
+        "from": "../cloudflared.exe",
+        "to": "cloudflared.exe"
+      }
+    ],
+    "win": {
+      "target": ["nsis"],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "FitTrack Pro"
+    }
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "bcrypt": "^5.1.1",
+    "lottie-react": "^2.4.0",
+    "electron-store": "^8.1.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.2.0",
+    "concurrently": "^8.0.0",
+    "electron": "^25.0.0",
+    "electron-builder": "^24.9.1",
+    "vite": "^5.0.0"
+  }
+}
+
+

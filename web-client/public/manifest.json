@@ -1,0 +1,34 @@
+{
+  "name": "My Fitness Journey - FitTrack Pro",
+  "short_name": "FitTrack",
+  "description": "Your personal fitness progress tracker",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1a1a2e",
+  "theme_color": "#FF4B39",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/animations/gym-fitness.json",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["health", "fitness", "lifestyle"],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "View Progress",
+      "short_name": "Progress",
+      "description": "See your fitness progress",
+      "url": "/",
+      "icons": [
+        {
+          "src": "/animations/gym-fitness.json",
+          "sizes": "96x96"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+installer/build/
+installer/output/
+web-client/dist/
+uploads/
+node_modules/
+web-client/node_modules/

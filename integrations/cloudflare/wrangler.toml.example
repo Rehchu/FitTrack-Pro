@@ -1,0 +1,23 @@
+name = "fittrack-pro-worker"
+compatibility_date = "2025-10-28"
+type = "javascript"
+workers_dev = true
+
+# Replace with your Cloudflare account id
+account_id = "YOUR_CLOUDFLARE_ACCOUNT_ID"
+
+# Bind KV and D1 using the IDs you supplied
+kv_namespaces = [
+  { binding = "FITTRACK_KV", id = "d31f5b43bd964ce78d87d9dd5878cc25" }
+]
+
+d1_databases = [
+  { binding = "FITTRACK_D1", database_name = "fittrack-pro-db", database_id = "4bc69687-f28a-4be1-9a0d-d3bc0b0583d2" }
+]
+
+[vars]
+# Public backend origin (can be your server or a tunnel URL)
+BACKEND_ORIGIN = "https://your-backend.example.com"
+
+# Optional: define a route or deploy to workers_dev
+# route = "https://your-domain.example/*"

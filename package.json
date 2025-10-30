@@ -1,0 +1,11 @@
+{
+  "dependencies": {
+    "lottie-react": "^2.4.1"
+  },
+  "devDependencies": {
+    "markdownlint-cli": "^0.39.0"
+  },
+  "scripts": {
+    "lint:md": "markdownlint \"**/*.md\" -c .markdownlint.json -i installer/build -i installer/output -i web-client/dist -i uploads -i \"**/node_modules/**\""
+  }
+}

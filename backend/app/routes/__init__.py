@@ -1,0 +1,10 @@
+from .trainer_router import router as trainer_router
+from .team_router import router as team_router
+from .messaging_router import router as messaging_router
+from .video_router import router as video_router
+from .branding_router import router as branding_router
+from .push_router import router as push_router
+from .measurements_router import router as measurements_router
+from .meal_router import router as meal_router
+from .samsung_router import router as samsung_router
+from .quest_router import router as quest_router

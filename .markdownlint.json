@@ -1,0 +1,21 @@
+{
+  "default": true,
+  "MD013": false,
+  "MD033": false,
+  "MD026": false,
+  "MD041": true,
+  "MD004": { "style": "dash" },
+  
+  "MD012": { "maximum": 2 },
+  "MD025": { "level": 1 },
+  "MD007": { "indent": 2 },
+  "MD034": false,
+  "MD040": false,
+  "MD022": false,
+  "MD032": false,
+  "MD031": false,
+  "MD029": false,
+  "MD024": false,
+  "MD036": false,
+  "MD009": false
+}

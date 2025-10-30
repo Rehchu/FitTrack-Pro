@@ -1,0 +1,151 @@
+name = "fittrack-pro-desktop"
+main = "worker-enhanced.js"
+compatibility_date = "2025-10-28"
+
+# Your Cloudflare account ID
+# Find it at: Dashboard → Workers & Pages → Overview (right sidebar)
+account_id = "4f61fb25b226afc8c61c1b069ea14ed9"
+
+# Deploy to workers.dev subdomain
+workers_dev = true
+
+# Production routes (optional - add custom domain later)
+# routes = [
+#   { pattern = "fittrack-pro-desktop.rehchu1.workers.dev/*", zone_name = "rehchu1.workers.dev" }
+# ]
+
+# ==================== KV NAMESPACE ====================
+# Global key-value storage for caching
+[[kv_namespaces]]
+binding = "FITTRACK_KV"
+id = "d31f5b43bd964ce78d87d9dd5878cc25"
+
+# ==================== D1 DATABASE ====================
+# Serverless SQL database for edge data
+[[d1_databases]]
+binding = "FITTRACK_D1"
+database_name = "fittrack-pro-db"
+database_id = "4bc69687-f28a-4be1-9a0d-d3bc0b0583d2"
+
+# ==================== WORKERS AI ====================
+# AI models for intelligent features
+[ai]
+binding = "AI"
+
+# ==================== ANALYTICS ENGINE ====================
+# Track custom events and metrics
+[[analytics_engine_datasets]]
+binding = "ANALYTICS"
+dataset = "fittrack_events"
+
+# ==================== VECTORIZE ====================
+# Vector database for semantic search
+[[vectorize]]
+binding = "VECTORIZE"
+index_name = "fittrack-exercises"
+
+# ==================== DURABLE OBJECTS ====================
+# Stateful objects for real-time chat
+[[durable_objects.bindings]]
+name = "CHAT_ROOM"
+class_name = "ChatRoom"
+script_name = "fittrack-pro-desktop"
+
+# Migration for Durable Objects
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["ChatRoom"]
+
+# ==================== R2 BUCKETS ====================
+# Object storage for uploads (photos, videos, thumbnails)
+[[r2_buckets]]
+binding = "R2_UPLOADS"
+bucket_name = "fittrack-uploads"
+
+# ==================== HYPERDRIVE (Optional) ====================
+# Uncomment if using PostgreSQL/MySQL backend
+# [[hyperdrive]]
+# binding = "HYPERDRIVE"
+# id = "YOUR_HYPERDRIVE_ID"
+
+# ==================== SECRETS ====================
+# Set these via: wrangler secret put SECRET_NAME
+# Secrets are encrypted and never exposed in code
+#
+# Required secrets:
+# - JWT_SECRET (for token validation)
+# - USDA_API_KEY (nutrition API)
+# - EXERCISEDB_API_KEY (exercise API)
+# - ENCRYPTION_KEY (data encryption)
+# - WEBHOOK_SECRET (webhook validation)
+#
+# Optional secrets:
+# - OPENAI_API_KEY (AI fallback)
+# - SMTP_PASSWORD (email sending)
+# - DATABASE_URL (for Hyperdrive)
+
+# ==================== ENVIRONMENT VARIABLES ====================
+# Public variables (non-sensitive)
+[vars]
+BACKEND_ORIGIN = ""
+WORKER_URL = "https://fittrack-pro-desktop.rehchu1.workers.dev"
+ALLOWED_ORIGINS = "*"
+
+# (No per-request CPU limit in Free plan)
+
+# ==================== BUILD CONFIGURATION ====================
+# If using TypeScript or build steps
+# [build]
+# command = "npm run build"
+# cwd = "integrations/cloudflare"
+
+# ==================== COMPATIBILITY FLAGS ====================
+# Enable new features
+compatibility_flags = [
+  "nodejs_compat"
+]
+
+# ==================== OBSERVABILITY ====================
+# Enable tail logging
+[observability]
+enabled = true
+
+# ==================== TRIGGERS ====================
+# Cron triggers for scheduled tasks (optional)
+# [triggers]
+# crons = [
+#   "0 0 * * *"  # Daily cleanup at midnight UTC
+# ]
+
+# ==================== DEVELOPMENT ====================
+# Local development settings
+[dev]
+ip = "127.0.0.1"
+port = 8787
+local_protocol = "http"
+
+# ==================== NOTES ====================
+#
+# Setup Steps:
+# 1. Replace YOUR_ACCOUNT_ID with your Cloudflare account ID
+# 2. Create D1 database: wrangler d1 create fittrack-pro-db
+# 3. Create Vectorize index: wrangler vectorize create fittrack-exercises --dimensions=384 --metric=cosine
+# 4. Set secrets: wrangler secret put JWT_SECRET (and others)
+# 5. Deploy: wrangler deploy
+#
+# Useful Commands:
+# - wrangler dev (local development)
+# - wrangler deploy (deploy to production)
+# - wrangler tail (view live logs)
+# - wrangler d1 execute fittrack-pro-db --file=schema.sql
+# - wrangler secret list (view secret names)
+# - wrangler kv:key get FITTRACK_KV "key-name" (debug KV)
+#
+# Free Tier Limits:
+# - 100,000 requests/day
+# - 10ms CPU time per request
+# - 10,000 Workers AI neurons/day
+# - 5GB D1 storage
+# - 100,000 KV reads/day, 1,000 writes/day
+# - 100,000 Hyperdrive queries/day
+# - 200,000 Analytics events/day

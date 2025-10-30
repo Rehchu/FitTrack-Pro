@@ -1,0 +1,110 @@
+# ==================== Secrets & Environment ====================
+.env
+.env.*
+*.key
+*.pem
+secrets-generated.json
+wrangler.toml.example
+
+# ==================== Node ====================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+.pnpm-debug.log*
+
+# ==================== Python ====================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+.venv/
+venv/
+ENV/
+env/
+
+# ==================== IDEs ====================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ==================== Build Artifacts ====================
+dist/
+dist-new/
+build/
+out/
+*.log
+*.sqlite
+*.db
+
+# ==================== Desktop App ====================
+desktop-app/dist/
+desktop-app/dist-new/
+desktop-app/build/
+desktop-app/node_modules/
+desktop-app/.cache/
+
+# ==================== Installer ====================
+installer/output/
+installer/build/FitTrack Pro.bat
+installer/build/backend/
+installer/build/desktop-app/
+installer/build/python/
+
+# ==================== Uploads ====================
+uploads/
+backend/uploads/
+web-client/uploads/
+
+# ==================== Testing ====================
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.hypothesis/
+tests/__pycache__/
+
+# ==================== Cloudflare ====================
+# Keep wrangler.toml but exclude secrets
+# secrets-generated.json excluded above
+.wrangler/
+wrangler.toml.local
+
+# ==================== OS ====================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# ==================== Misc ====================
+*.bak
+*.tmp
+*.temp
+.cache/
