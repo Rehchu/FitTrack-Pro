@@ -1,0 +1,7 @@
+# This project uses Cloudflare Workers, not Pages
+# Deployment is handled via GitHub Actions workflow
+# See: .github/workflows/deploy.yml
+
+# To manually deploy the Worker:
+# cd integrations/cloudflare
+# wrangler deploy

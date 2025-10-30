@@ -1,0 +1,9 @@
+# Cloudflare Pages Build Configuration
+# This file tells Cloudflare Pages how to build from the correct directory
+
+[build]
+  command = "cd integrations/cloudflare && npx wrangler deploy"
+  publish = "integrations/cloudflare"
+
+[build.environment]
+  NODE_VERSION = "20"
