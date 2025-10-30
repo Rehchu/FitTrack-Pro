@@ -9,7 +9,7 @@
  * Runs: Every Monday at 9 AM UTC
  */
 
-import { WorkflowEntrypoint, WorkflowStep } from "cloudflare:workers";
+import { WorkflowEntrypoint } from "cloudflare:workers";
 
 export class DependencyUpdateWorkflow extends WorkflowEntrypoint {
   async run(event, step) {
