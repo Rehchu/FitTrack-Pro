@@ -1,0 +1,14 @@
+{
+  "name": "fittrack-pro-worker",
+  "version": "1.1.0",
+  "description": "FitTrack Pro Cloudflare Worker - Edge Backend",
+  "private": true,
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev",
+    "tail": "wrangler tail"
+  },
+  "devDependencies": {
+    "wrangler": "^4.45.2"
+  }
+}
