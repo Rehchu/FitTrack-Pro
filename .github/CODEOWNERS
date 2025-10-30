@@ -1,0 +1,23 @@
+# Code Owners - Auto-request reviews from these people/teams
+# Learn more: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owner for everything in the repo
+* @Rehchu
+
+# Cloudflare Worker and infrastructure
+/integrations/cloudflare/** @Rehchu
+/.github/workflows/** @Rehchu
+
+# Critical configuration files
+/wrangler.toml @Rehchu
+/package.json @Rehchu
+/.gitignore @Rehchu
+
+# Backend code
+/backend/** @Rehchu
+
+# Desktop app
+/desktop-app/** @Rehchu
+
+# Web client
+/web-client/** @Rehchu
