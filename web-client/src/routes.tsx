@@ -5,6 +5,8 @@ import { MeasurementPage } from './pages/MeasurementPage';
 import { MealPlanPage } from './pages/MealPlanPage';
 import { PublicProfilePage } from './pages/PublicProfilePage';
 import { CalendarPage } from './pages/CalendarPage';
+import { ClientsPage } from './pages/ClientsPage';
+import { ClientDetailPage } from './pages/ClientDetailPage';
 import { useAuthStore } from './stores/authStore';
 
 function RequireAuth({ children }: { children: JSX.Element }) {
@@ -25,12 +27,15 @@ export function AppRoutes() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/dashboard" element={<RequireAuth><Dashboard /></RequireAuth>} />
-  <Route path="/calendar" element={<RequireAuth><CalendarPage /></RequireAuth>} />
+      <Route path="/calendar" element={<RequireAuth><CalendarPage /></RequireAuth>} />
+      <Route path="/clients" element={<RequireAuth><ClientsPage /></RequireAuth>} />
+      <Route path="/clients/:clientId" element={<RequireAuth><ClientDetailPage /></RequireAuth>} />
       <Route path="/clients/:clientId/measurements" element={<RequireAuth><MeasurementPage isTrainer={true} /></RequireAuth>} />
       <Route path="/clients/:clientId/meals" element={<RequireAuth><MealPlanPage /></RequireAuth>} />
       
       {/* Public route - no auth required */}
       <Route path="/profile/:token" element={<PublicProfilePage />} />
+      <Route path="/client/:clientname" element={<PublicProfilePage />} />
 
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
     </Routes>
