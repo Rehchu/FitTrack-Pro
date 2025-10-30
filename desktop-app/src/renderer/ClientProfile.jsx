@@ -2,6 +2,10 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { FitnessAvatar, calculateProgressScore } from './FitnessAvatar';
 import { WorkoutBuilder } from './WorkoutBuilder';
 import { MealBuilder } from './MealBuilder';
+import { ChatTab } from './ChatTab';
+import { VideoCallTab } from './VideoCallTab';
+import { QuestTab } from './QuestTab';
+import { DemographicsTab } from './DemographicsTab';
 
 export function ClientProfile({ client, apiBase, onBack, onEmail, onShare }) {
   const [avatarUrl, setAvatarUrl] = useState(null);
@@ -278,6 +282,10 @@ export function ClientProfile({ client, apiBase, onBack, onEmail, onShare }) {
         <button onClick={() => setActiveTab('workouts')} className={activeTab==='workouts' ? 'btn-primary' : ''}>Workouts</button>
         <button onClick={() => setActiveTab('meals')} className={activeTab==='meals' ? 'btn-primary' : ''}>Meals</button>
         <button onClick={() => setActiveTab('achievements')} className={activeTab==='achievements' ? 'btn-primary' : ''}>Achievements</button>
+        <button onClick={() => setActiveTab('chat')} className={activeTab==='chat' ? 'btn-primary' : ''}>💬 Chat</button>
+        <button onClick={() => setActiveTab('video')} className={activeTab==='video' ? 'btn-primary' : ''}>📹 Video</button>
+        <button onClick={() => setActiveTab('quests')} className={activeTab==='quests' ? 'btn-primary' : ''}>🎯 Quests</button>
+        <button onClick={() => setActiveTab('demographics')} className={activeTab==='demographics' ? 'btn-primary' : ''}>🔒 Demographics</button>
       </div>
 
       {error && <div className="banner-warning" style={{ marginTop: 12 }}>Error: {error}</div>}
@@ -526,33 +534,165 @@ export function ClientProfile({ client, apiBase, onBack, onEmail, onShare }) {
 
       {activeTab === 'workouts' && (
         <div style={{ marginTop: 16 }}>
-          <button className="btn-primary" onClick={() => setShowWorkoutBuilder(true)} style={{ marginBottom: 16 }}>
-            + Create Workout Plan
-          </button>
-          <ul>
-            {workouts.map(w => (
-              <li key={w.id}>
-                <span>{w.title} — {w.scheduled_at?.slice(0,10)}</span>
-              </li>
-            ))}
-            {workouts.length === 0 && <div className="small">No workouts yet. Click "Create Workout Plan" to get started.</div>}
-          </ul>
+          <h3 style={{ color: '#FFB82B' }}>💪 Workout Plans</h3>
+          
+          <div style={{ marginBottom: 24 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <h4 style={{ margin: 0 }}>📋 Trainer-Assigned Workouts</h4>
+              <button className="btn-primary" onClick={() => setShowWorkoutBuilder(true)}>
+                + Assign New Workout
+              </button>
+            </div>
+            <div style={{ background: '#2a2f42', padding: 16, borderRadius: 8 }}>
+              <ul style={{ margin: 0 }}>
+                {workouts.filter(w => w.assigned_by_trainer !== false).map(w => (
+                  <li key={w.id}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <strong>{w.title}</strong>
+                        <div className="small" style={{ opacity: 0.7 }}>
+                          Scheduled: {w.scheduled_at?.slice(0,10)}
+                        </div>
+                      </div>
+                      <div style={{ 
+                        padding: '4px 12px', 
+                        borderRadius: 20, 
+                        background: '#FFB82B33',
+                        color: '#FFB82B',
+                        fontSize: 12
+                      }}>
+                        Trainer Plan
+                      </div>
+                    </div>
+                  </li>
+                ))}
+                {workouts.filter(w => w.assigned_by_trainer !== false).length === 0 && (
+                  <div className="small" style={{ opacity: 0.7 }}>
+                    No trainer-assigned workouts yet. Click "Assign New Workout" to create a plan.
+                  </div>
+                )}
+              </ul>
+            </div>
+          </div>
+
+          <div>
+            <h4 style={{ margin: 0, marginBottom: 12, color: '#1BB55C' }}>📝 Client-Logged Workouts</h4>
+            <div style={{ background: '#2a2f42', padding: 16, borderRadius: 8, opacity: 0.9 }}>
+              <div className="small" style={{ marginBottom: 8, opacity: 0.8 }}>
+                These are workouts that {client.name} logged on their own, separate from your assigned plans.
+              </div>
+              <ul style={{ margin: 0 }}>
+                {workouts.filter(w => w.assigned_by_trainer === false).map(w => (
+                  <li key={w.id}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <strong>{w.title}</strong>
+                        <div className="small" style={{ opacity: 0.7 }}>
+                          Completed: {w.scheduled_at?.slice(0,10)}
+                        </div>
+                      </div>
+                      <div style={{ 
+                        padding: '4px 12px', 
+                        borderRadius: 20, 
+                        background: '#1BB55C33',
+                        color: '#1BB55C',
+                        fontSize: 12
+                      }}>
+                        Client Logged
+                      </div>
+                    </div>
+                  </li>
+                ))}
+                {workouts.filter(w => w.assigned_by_trainer === false).length === 0 && (
+                  <div className="small" style={{ opacity: 0.7 }}>
+                    No client-logged workouts yet.
+                  </div>
+                )}
+              </ul>
+            </div>
+          </div>
         </div>
       )}
 
       {activeTab === 'meals' && (
         <div style={{ marginTop: 16 }}>
-          <button className="btn-primary" onClick={() => setShowMealBuilder(true)} style={{ marginBottom: 16 }}>
-            + Create Meal Plan
-          </button>
-          <ul>
-            {meals.map(meal => (
-              <li key={meal.id}>
-                <span>{meal.date?.slice(0,10)} — {meal.name} • {meal.total_nutrients?.calories ?? 0} kcal</span>
-              </li>
-            ))}
-            {meals.length === 0 && <div className="small">No meals yet. Click "Create Meal Plan" to get started.</div>}
-          </ul>
+          <h3 style={{ color: '#FFB82B' }}>🍽️ Meal Plans</h3>
+          
+          <div style={{ marginBottom: 24 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <h4 style={{ margin: 0 }}>📋 Trainer-Assigned Meal Plans</h4>
+              <button className="btn-primary" onClick={() => setShowMealBuilder(true)}>
+                + Assign New Meal Plan
+              </button>
+            </div>
+            <div style={{ background: '#2a2f42', padding: 16, borderRadius: 8 }}>
+              <ul style={{ margin: 0 }}>
+                {meals.filter(m => m.assigned_by_trainer !== false).map(meal => (
+                  <li key={meal.id}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <strong>{meal.name}</strong>
+                        <div className="small" style={{ opacity: 0.7 }}>
+                          {meal.date?.slice(0,10)} • {meal.total_nutrients?.calories ?? 0} kcal
+                        </div>
+                      </div>
+                      <div style={{ 
+                        padding: '4px 12px', 
+                        borderRadius: 20, 
+                        background: '#FFB82B33',
+                        color: '#FFB82B',
+                        fontSize: 12
+                      }}>
+                        Trainer Plan
+                      </div>
+                    </div>
+                  </li>
+                ))}
+                {meals.filter(m => m.assigned_by_trainer !== false).length === 0 && (
+                  <div className="small" style={{ opacity: 0.7 }}>
+                    No trainer-assigned meal plans yet. Click "Assign New Meal Plan" to create nutrition guidance.
+                  </div>
+                )}
+              </ul>
+            </div>
+          </div>
+
+          <div>
+            <h4 style={{ margin: 0, marginBottom: 12, color: '#1BB55C' }}>📝 Client-Logged Meals</h4>
+            <div style={{ background: '#2a2f42', padding: 16, borderRadius: 8, opacity: 0.9 }}>
+              <div className="small" style={{ marginBottom: 8, opacity: 0.8 }}>
+                These are meals that {client.name} logged on their own, separate from your assigned plans.
+              </div>
+              <ul style={{ margin: 0 }}>
+                {meals.filter(m => m.assigned_by_trainer === false).map(meal => (
+                  <li key={meal.id}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <strong>{meal.name}</strong>
+                        <div className="small" style={{ opacity: 0.7 }}>
+                          {meal.date?.slice(0,10)} • {meal.total_nutrients?.calories ?? 0} kcal
+                        </div>
+                      </div>
+                      <div style={{ 
+                        padding: '4px 12px', 
+                        borderRadius: 20, 
+                        background: '#1BB55C33',
+                        color: '#1BB55C',
+                        fontSize: 12
+                      }}>
+                        Client Logged
+                      </div>
+                    </div>
+                  </li>
+                ))}
+                {meals.filter(m => m.assigned_by_trainer === false).length === 0 && (
+                  <div className="small" style={{ opacity: 0.7 }}>
+                    No client-logged meals yet.
+                  </div>
+                )}
+              </ul>
+            </div>
+          </div>
         </div>
       )}
 
@@ -572,6 +712,30 @@ export function ClientProfile({ client, apiBase, onBack, onEmail, onShare }) {
               ))}
             </ul>
           )}
+        </div>
+      )}
+
+      {activeTab === 'chat' && (
+        <div style={{ marginTop: 16 }}>
+          <ChatTab client={client} apiBase={apiBase} />
+        </div>
+      )}
+
+      {activeTab === 'video' && (
+        <div style={{ marginTop: 16 }}>
+          <VideoCallTab client={client} apiBase={apiBase} />
+        </div>
+      )}
+
+      {activeTab === 'quests' && (
+        <div style={{ marginTop: 16 }}>
+          <QuestTab client={client} apiBase={apiBase} />
+        </div>
+      )}
+
+      {activeTab === 'demographics' && (
+        <div style={{ marginTop: 16 }}>
+          <DemographicsTab client={client} apiBase={apiBase} />
         </div>
       )}
     </div>
