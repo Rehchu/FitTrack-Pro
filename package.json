@@ -6,6 +6,8 @@
     "markdownlint-cli": "^0.39.0"
   },
   "scripts": {
-    "lint:md": "markdownlint \"**/*.md\" -c .markdownlint.json -i installer/build -i installer/output -i web-client/dist -i uploads -i \"**/node_modules/**\""
+    "lint:md": "markdownlint \"**/*.md\" -c .markdownlint.json -i installer/build -i installer/output -i web-client/dist -i uploads -i \"**/node_modules/**\"",
+    "cf:worker:deploy": "cd integrations/cloudflare && npx wrangler deploy worker-enhanced.js",
+    "cf:versions:upload": "npx wrangler versions upload integrations/cloudflare/worker-enhanced.js"
   }
 }
