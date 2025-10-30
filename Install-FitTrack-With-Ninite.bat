@@ -28,8 +28,10 @@ echo.
 pause
 echo.
 
-:: Get the directory where this batch file is located (USB drive)
-set SCRIPT_DIR=%~dp0
+:: USB drive configuration
+set USB_DRIVE=F:\
+set NINITE_NAME=Ninite 7Zip ASPNET Core Runtime 8 Installer.exe
+set NINITE_PATH=%USB_DRIVE%%NINITE_NAME%
 
 :: Step 1: Look for Ninite installer
 echo ========================================
@@ -37,20 +39,26 @@ echo Step 1: Running Ninite Installer
 echo ========================================
 echo.
 
-:: Look for Ninite executable in the same directory
-for %%f in ("%SCRIPT_DIR%Ninite*.exe") do (
-    echo Found Ninite installer: %%~nxf
+:: Look for Ninite executable on USB drive
+if exist "%NINITE_PATH%" (
+    echo Found Ninite installer: %NINITE_NAME%
+    echo Location: %NINITE_PATH%
     echo Running Ninite...
     echo.
-    start /wait "%%f"
+    start /wait "%NINITE_PATH%"
     echo.
     echo Ninite installation complete!
     goto :RunFitTrack
 )
 
-:: If no Ninite found, skip it
-echo No Ninite installer found in USB drive
-echo Looking for: %SCRIPT_DIR%Ninite*.exe
+:: If no Ninite found, show error
+echo ERROR: Ninite installer not found!
+echo Expected location: %NINITE_PATH%
+echo.
+echo Please ensure:
+echo   - USB drive is plugged in and assigned to F:\
+echo   - Ninite installer is named: %NINITE_NAME%
+echo.
 echo Skipping to FitTrack Pro installation...
 echo.
 

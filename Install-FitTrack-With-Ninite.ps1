@@ -30,8 +30,10 @@ Write-Host ""
 Write-Host "Press any key to begin installation..." -ForegroundColor Cyan
 $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
 
-# Get the directory where this script is located (USB drive)
-$scriptDir = Split-Path -Parent $PSCommandPath
+# USB drive configuration
+$usbDrive = "F:\"
+$niniteName = "Ninite 7Zip ASPNET Core Runtime 8 Installer.exe"
+$ninitePath = Join-Path $usbDrive $niniteName
 
 # Step 1: Run Ninite
 Write-Host ""
@@ -40,23 +42,25 @@ Write-Host "║         Step 1: Running Ninite Installer      ║" -ForegroundCo
 Write-Host "╚════════════════════════════════════════════════╝" -ForegroundColor Cyan
 Write-Host ""
 
-# Look for Ninite executable in the same directory
-$niniteExe = Get-ChildItem -Path $scriptDir -Filter "Ninite*.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
-
-if ($niniteExe) {
-    Write-Host "✅ Found Ninite installer: $($niniteExe.Name)" -ForegroundColor Green
+# Look for Ninite executable on USB drive
+if (Test-Path $ninitePath) {
+    Write-Host "✅ Found Ninite installer: $niniteName" -ForegroundColor Green
+    Write-Host "   Location: $ninitePath" -ForegroundColor Gray
     Write-Host "📦 Running Ninite..." -ForegroundColor Cyan
     Write-Host ""
     
     # Run Ninite and wait for it to complete
-    Start-Process -FilePath $niniteExe.FullName -Wait
+    Start-Process -FilePath $ninitePath -Wait
     
     Write-Host ""
     Write-Host "✅ Ninite installation complete!" -ForegroundColor Green
 } else {
-    Write-Host "⚠️  No Ninite installer found in USB drive" -ForegroundColor Yellow
-    Write-Host "   Looking in: $scriptDir" -ForegroundColor Gray
-    Write-Host "   Expected: Ninite*.exe" -ForegroundColor Gray
+    Write-Host "❌ Ninite installer not found!" -ForegroundColor Red
+    Write-Host "   Expected location: $ninitePath" -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "Please ensure:" -ForegroundColor Yellow
+    Write-Host "  • USB drive is plugged in and assigned to F:\" -ForegroundColor Yellow
+    Write-Host "  • Ninite installer is named: $niniteName" -ForegroundColor Yellow
     Write-Host ""
     Write-Host "Skipping to FitTrack Pro installation..." -ForegroundColor Yellow
 }
