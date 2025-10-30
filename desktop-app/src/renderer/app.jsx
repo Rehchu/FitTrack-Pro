@@ -33,9 +33,9 @@ function App() {
     if (trainerConfig?.workerUrl) {
       return `${trainerConfig.workerUrl}/api`;
     }
-    // Default to Cloudflare Worker (free tier, globally distributed, always available)
-    // Worker proxies requests to local backend via Cloudflare Tunnel
-    return 'https://fittrack-pro-desktop.rehchu1.workers.dev/api';
+    // For desktop app, prefer local backend for best performance
+    // Worker will be used only when backend is offline
+    return 'http://127.0.0.1:8000';
   }, [trainerConfig]);
 
   useEffect(() => {
@@ -93,7 +93,7 @@ function App() {
   }
 
   async function fetchClients(config = trainerConfig) {
-    const base = config?.workerUrl ? `${config.workerUrl}/api` : 'https://fittrack-pro-desktop.rehchu1.workers.dev/api';
+    const base = config?.workerUrl ? `${config.workerUrl}/api` : 'http://127.0.0.1:8000';
     try {
       const response = await fetch(`${base}/clients`);
       const data = await response.json();

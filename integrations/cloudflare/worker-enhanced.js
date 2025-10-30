@@ -54,6 +54,50 @@ export default {
           }
         }, corsHeaders);
       }
+      
+      // ==================== PWA ASSETS ====================
+      
+      // PWA Manifest
+      if (path === '/manifest.json') {
+        return jsonResponse({
+          name: 'FitTrack Pro - Client Profile',
+          short_name: 'FitTrack',
+          description: 'Track your fitness journey',
+          start_url: '/',
+          display: 'standalone',
+          background_color: '#1a1d2e',
+          theme_color: '#1a1d2e',
+          icons: [
+            {
+              src: '/icon-192.png',
+              sizes: '192x192',
+              type: 'image/png',
+              purpose: 'any maskable'
+            },
+            {
+              src: '/icon-512.png',
+              sizes: '512x512',
+              type: 'image/png',
+              purpose: 'any maskable'
+            }
+          ]
+        }, {
+          ...corsHeaders,
+          'Content-Type': 'application/manifest+json'
+        });
+      }
+      
+      // Service Worker for offline support
+      if (path === '/sw.js') {
+        const swCode = getServiceWorkerCode();
+        return new Response(swCode, {
+          headers: {
+            'Content-Type': 'application/javascript',
+            'Cache-Control': 'public, max-age=3600',
+            ...corsHeaders
+          }
+        });
+      }
 
       // ==================== REAL-TIME CHAT (Durable Objects) ====================
       if (path.startsWith('/chat/')) {
@@ -136,15 +180,31 @@ export default {
 
       // ==================== EDGE CACHING (KV + D1) ====================
       
-      // Public profile with aggressive caching
-      if (path.startsWith('/public/profile/')) {
+      // Public profile with friendly URLs: /client/{clientname} or /profile/{token}
+      if (path.startsWith('/client/') || path.startsWith('/profile/')) {
         await trackAnalytics(env, 'profile_view', req);
-        const token = path.split('/').pop();
+        
+        const isClientPath = path.startsWith('/client/');
+        const identifier = path.split('/').pop();
+        
+        // If it's a client name path, look up the token first
+        let token = identifier;
+        if (isClientPath) {
+          // Query D1 for client by friendly name
+          const clientLookup = await env.FITTRACK_D1.prepare(
+            'SELECT share_token FROM clients WHERE LOWER(REPLACE(name, " ", "")) = LOWER(?)'
+          ).bind(identifier).first();
+          
+          if (!clientLookup) {
+            return serveProfileHTML(null, corsHeaders, 404);
+          }
+          token = clientLookup.share_token;
+        }
         
         // Try D1 cache first (faster than KV)
         const cachedProfile = await getProfileFromD1(env, token);
         if (cachedProfile) {
-          return jsonResponse(cachedProfile, {
+          return serveProfileHTML(cachedProfile, {
             ...corsHeaders,
             'X-Cache': 'D1-HIT',
             'Cache-Control': 'public, max-age=300'
@@ -156,7 +216,7 @@ export default {
         if (kvCached) {
           // Store in D1 for next time
           ctx.waitUntil(cacheProfileInD1(env, token, kvCached));
-          return jsonResponse(kvCached, {
+          return serveProfileHTML(kvCached, {
             ...corsHeaders,
             'X-Cache': 'KV-HIT',
             'Cache-Control': 'public, max-age=300'
@@ -166,12 +226,12 @@ export default {
         // Fetch from backend (only if configured)
         const backend = env.BACKEND_ORIGIN || '';
         if (!backend) {
-          return jsonResponse({ error: 'Profile not found' }, corsHeaders, 404);
+          return serveProfileHTML(null, corsHeaders, 404);
         }
         const backendResp = await fetch(`${backend}/public/profile/${token}`);
         
         if (!backendResp.ok) {
-          return jsonResponse({ error: 'Profile not found' }, corsHeaders, 404);
+          return serveProfileHTML(null, corsHeaders, 404);
         }
 
         const profile = await backendResp.json();
@@ -182,11 +242,17 @@ export default {
           cacheProfileInD1(env, token, profile)
         ]));
 
-        return jsonResponse(profile, {
+        return serveProfileHTML(profile, {
           ...corsHeaders,
           'X-Cache': 'MISS',
           'Cache-Control': 'public, max-age=300'
         });
+      }
+      
+      // Legacy API endpoint for backward compatibility
+      if (path.startsWith('/public/profile/')) {
+        const token = path.split('/').pop();
+        return Response.redirect(`${url.origin}/profile/${token}`, 301);
       }
 
       // ==================== ANALYTICS DASHBOARD ====================
@@ -727,4 +793,333 @@ function jsonResponse(data, headers = {}, status = 200) {
 
 function isStaticAsset(pathname) {
   return /\.(?:html|js|css|png|jpg|jpeg|gif|svg|webp|ico|woff2?|ttf|mp4|webm)$/.test(pathname) || pathname === '/';
+}
+
+// ==================== PWA PROFILE PAGE ====================
+
+function serveProfileHTML(profile, headers = {}, status = 200) {
+  if (!profile) {
+    return new Response(getNotFoundHTML(), {
+      status: 404,
+      headers: {
+        'Content-Type': 'text/html; charset=utf-8',
+        ...headers
+      }
+    });
+  }
+
+  const html = getProfileHTML(profile);
+  
+  return new Response(html, {
+    status,
+    headers: {
+      'Content-Type': 'text/html; charset=utf-8',
+      ...headers
+    }
+  });
+}
+
+function getProfileHTML(profile) {
+  const { client, trainer, measurements, meals, achievements } = profile;
+  const clientName = client?.name || 'Client';
+  const trainerName = trainer?.name || 'Trainer';
+  const latestWeight = measurements?.[0]?.weight || 0;
+  const latestBodyFat = measurements?.[0]?.body_fat || 0;
+  
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="${clientName}'s fitness journey with ${trainerName}">
+    <meta name="theme-color" content="#1a1d2e">
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json">
+    
+    <!-- Apple Touch Icons -->
+    <link rel="apple-touch-icon" href="/icon-192.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="${clientName} - FitTrack">
+    
+    <title>${clientName} - FitTrack Pro</title>
+    
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #1a1d2e 0%, #2a2f42 100%);
+            color: #e5e7eb;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        .header {
+            text-align: center;
+            padding: 30px 0;
+            border-bottom: 2px solid #FF4B39;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(135deg, #FF4B39 0%, #FFB82B 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+        .trainer-badge {
+            display: inline-block;
+            background: #2a2f42;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            color: #9ca3af;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+        .stat-card {
+            background: #2a2f42;
+            padding: 25px;
+            border-radius: 12px;
+            border-left: 4px solid #1BB55C;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+        .stat-label {
+            font-size: 0.85rem;
+            color: #9ca3af;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #1BB55C;
+        }
+        .section {
+            background: #2a2f42;
+            padding: 30px;
+            border-radius: 12px;
+            margin: 20px 0;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+        .section-title {
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            color: #FFB82B;
+        }
+        .achievement-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 15px;
+        }
+        .achievement {
+            background: linear-gradient(135deg, #FF4B39 0%, #FFB82B 100%);
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: bold;
+            color: #1a1d2e;
+        }
+        .install-prompt {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            background: #1BB55C;
+            color: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+            z-index: 1000;
+        }
+        .install-prompt.show { display: flex; }
+        .install-btn {
+            background: white;
+            color: #1BB55C;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        @media (max-width: 768px) {
+            .header h1 { font-size: 2rem; }
+            .stats-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>${clientName}</h1>
+            <div class="trainer-badge">Training with ${trainerName}</div>
+        </div>
+        
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">Current Weight</div>
+                <div class="stat-value">${latestWeight} kg</div>
+            </div>
+            <div class="stat-card" style="border-left-color: #FFB82B;">
+                <div class="stat-label">Body Fat</div>
+                <div class="stat-value" style="color: #FFB82B;">${latestBodyFat}%</div>
+            </div>
+            <div class="stat-card" style="border-left-color: #FF4B39;">
+                <div class="stat-label">Total Progress</div>
+                <div class="stat-value" style="color: #FF4B39;">${measurements?.length || 0}</div>
+            </div>
+        </div>
+        
+        ${achievements && achievements.length > 0 ? `
+        <div class="section">
+            <div class="section-title">🏆 Achievements</div>
+            <div class="achievement-grid">
+                ${achievements.map(a => `<div class="achievement">${a.name}</div>`).join('')}
+            </div>
+        </div>
+        ` : ''}
+        
+        <div class="section">
+            <div class="section-title">💪 Progress Journey</div>
+            <p style="color: #9ca3af; line-height: 1.6;">
+                ${clientName} is on an amazing fitness journey! 
+                ${measurements?.length || 0} measurements recorded so far.
+            </p>
+        </div>
+    </div>
+    
+    <div class="install-prompt" id="installPrompt">
+        <span>📱 Install this profile as an app!</span>
+        <button class="install-btn" id="installBtn">Install</button>
+    </div>
+    
+    <script>
+        // PWA Install Prompt
+        let deferredPrompt;
+        
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            document.getElementById('installPrompt').classList.add('show');
+        });
+        
+        document.getElementById('installBtn').addEventListener('click', async () => {
+            if (!deferredPrompt) return;
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            if (outcome === 'accepted') {
+                document.getElementById('installPrompt').classList.remove('show');
+            }
+            deferredPrompt = null;
+        });
+        
+        // Register service worker for offline support
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js').catch(err => {
+                console.log('Service Worker registration failed:', err);
+            });
+        }
+    </script>
+</body>
+</html>`;
+}
+
+function getNotFoundHTML() {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile Not Found - FitTrack Pro</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1d2e 0%, #2a2f42 100%);
+            color: #e5e7eb;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            text-align: center;
+            padding: 20px;
+        }
+        h1 { font-size: 4rem; color: #FF4B39; margin-bottom: 10px; }
+        p { font-size: 1.2rem; color: #9ca3af; }
+    </style>
+</head>
+<body>
+    <div>
+        <h1>404</h1>
+        <p>Client profile not found</p>
+    </div>
+</body>
+</html>`;
+}
+
+function getServiceWorkerCode() {
+  return `
+const CACHE_NAME = 'fittrack-profile-v1';
+const urlsToCache = [
+  '/',
+  '/manifest.json'
+];
+
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then((cache) => cache.addAll(urlsToCache))
+  );
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames.map((cacheName) => {
+          if (cacheName !== CACHE_NAME) {
+            return caches.delete(cacheName);
+          }
+        })
+      );
+    })
+  );
+  self.clients.claim();
+});
+
+self.addEventListener('fetch', (event) => {
+  event.respondWith(
+    caches.match(event.request)
+      .then((response) => {
+        if (response) {
+          return response;
+        }
+        return fetch(event.request).then((response) => {
+          if (!response || response.status !== 200 || response.type !== 'basic') {
+            return response;
+          }
+          const responseToCache = response.clone();
+          caches.open(CACHE_NAME)
+            .then((cache) => {
+              cache.put(event.request, responseToCache);
+            });
+          return response;
+        });
+      })
+  );
+});
+`;
 }
