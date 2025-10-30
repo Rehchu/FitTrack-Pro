@@ -4,9 +4,27 @@
 Write-Host "🚀 Executing Project FitTrack..." -ForegroundColor Cyan
 Write-Host ""
 
-# Get the project root directory
-$projectRoot = "E:\FitTrack Pro 1.1"
+# Determine the project root directory
+# Try to find it from the script location or current directory
+$scriptDir = Split-Path -Parent $PSCommandPath
+if (Test-Path (Join-Path $scriptDir ".git")) {
+    $projectRoot = $scriptDir
+} elseif (Test-Path ".git") {
+    $projectRoot = Get-Location
+} else {
+    # Fall back to hardcoded path if we can't find it
+    $projectRoot = "E:\FitTrack Pro 1.1"
+    if (!(Test-Path $projectRoot)) {
+        Write-Host "❌ Could not find FitTrack Pro project directory" -ForegroundColor Red
+        Write-Host "Please run this script from the project root directory" -ForegroundColor Yellow
+        Write-Host "Or use the bootstrap script to clone the repository" -ForegroundColor Yellow
+        exit 1
+    }
+}
+
 Set-Location $projectRoot
+Write-Host "📁 Project Root: $projectRoot" -ForegroundColor Cyan
+Write-Host ""
 
 # Check if auto-setup has been run
 $setupMarker = "$projectRoot\.fittrack-setup-complete"

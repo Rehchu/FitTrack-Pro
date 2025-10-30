@@ -2,7 +2,23 @@
 
 ## 🚀 One-Command Setup & Launch
 
-Just run this command and everything will be set up and running:
+### On a Fresh Machine (Zero Prerequisites)
+
+Run this command in PowerShell as Administrator to set up everything from scratch:
+
+```powershell
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/Rehchu/FitTrack-Pro/fix/cloudflare-pages-config/scripts/bootstrap-fittrack.ps1" -OutFile "$env:TEMP\bootstrap-fittrack.ps1"; & "$env:TEMP\bootstrap-fittrack.ps1"
+```
+
+This will:
+- Install all prerequisites (Git, Node.js, Python, VS Code, Docker)
+- Clone the repository
+- Set up the entire development environment
+- Ask if you want to start FitTrack Pro immediately
+
+### If You Already Have the Repository
+
+Just run this command:
 
 ```powershell
 .\execute-fittrack.ps1

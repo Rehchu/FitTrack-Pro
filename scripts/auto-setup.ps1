@@ -1,15 +1,22 @@
 # FitTrack Pro - Automated Setup Script
 # Usage: Just run this script and it handles everything
+# Can be run from any directory - will clone repo if needed
 
 param(
     [switch]$SkipDocker,
-    [switch]$SkipVSCodeExtensions
+    [switch]$SkipVSCodeExtensions,
+    [string]$InstallPath = "C:\Projects"
 )
 
 $ErrorActionPreference = "Stop"
 Write-Host "🚀 FitTrack Pro - Automated Setup" -ForegroundColor Cyan
 Write-Host "=================================" -ForegroundColor Cyan
 Write-Host ""
+
+# Repository configuration
+$repoUrl = "https://github.com/Rehchu/FitTrack-Pro.git"
+$repoBranch = "fix/cloudflare-pages-config"
+$repoName = "FitTrack-Pro"
 
 # Helper function to check if running as admin
 function Test-Admin {
@@ -70,19 +77,78 @@ Install-Software -Name "git" -ChocoPackage "git"
 Install-Software -Name "node" -ChocoPackage "nodejs-lts"
 Install-Software -Name "python" -ChocoPackage "python"
 
+# Refresh environment to get Git in PATH
+refreshenv
+
 # Step 3: Install Docker (optional)
 if (!$SkipDocker) {
     Write-Host ""
     Write-Host "🐳 Installing Docker Desktop..." -ForegroundColor Cyan
     if (!(Get-Command docker -ErrorAction SilentlyContinue)) {
         choco install docker-desktop -y
-        Write-Host "✅ Docker Desktop installed (restart required)" -ForegroundColor Green
+        Write-Host "✅ Docker Desktop installed (restart may be required)" -ForegroundColor Green
+        Write-Host "⚠️  Note: Docker requires WSL2 on Windows. If not installed, Docker will prompt you." -ForegroundColor Yellow
     } else {
         Write-Host "✅ Docker Desktop already installed" -ForegroundColor Green
     }
 }
 
-# Step 4: Install Wrangler CLI
+# Step 4: Install VS Code if not present
+Write-Host ""
+Write-Host "💻 Checking VS Code installation..." -ForegroundColor Cyan
+if (!(Get-Command code -ErrorAction SilentlyContinue)) {
+    Write-Host "📦 Installing Visual Studio Code..." -ForegroundColor Yellow
+    choco install vscode -y
+    refreshenv
+    Write-Host "✅ VS Code installed" -ForegroundColor Green
+} else {
+    Write-Host "✅ VS Code already installed" -ForegroundColor Green
+}
+
+# Step 5: Clone repository if not already in repo
+Write-Host ""
+Write-Host "📁 Setting up repository..." -ForegroundColor Cyan
+
+# Check if we're already in the repo
+$currentDir = Get-Location
+$isInRepo = Test-Path ".git"
+
+if (!$isInRepo) {
+    Write-Host "📦 Cloning FitTrack Pro repository..." -ForegroundColor Yellow
+    
+    # Create install directory if it doesn't exist
+    if (!(Test-Path $InstallPath)) {
+        New-Item -ItemType Directory -Path $InstallPath -Force | Out-Null
+        Write-Host "✅ Created directory: $InstallPath" -ForegroundColor Green
+    }
+    
+    Set-Location $InstallPath
+    
+    # Clone the repository
+    if (Test-Path (Join-Path $InstallPath $repoName)) {
+        Write-Host "⚠️  Repository already exists at $InstallPath\$repoName" -ForegroundColor Yellow
+        Set-Location (Join-Path $InstallPath $repoName)
+        
+        # Pull latest changes
+        Write-Host "📥 Pulling latest changes..." -ForegroundColor Yellow
+        git fetch origin
+        git checkout $repoBranch
+        git pull origin $repoBranch
+    } else {
+        Write-Host "🔄 Cloning from $repoUrl..." -ForegroundColor Yellow
+        git clone $repoUrl
+        Set-Location $repoName
+        git checkout $repoBranch
+    }
+    
+    Write-Host "✅ Repository ready at: $(Get-Location)" -ForegroundColor Green
+    $projectRoot = Get-Location
+} else {
+    Write-Host "✅ Already in FitTrack Pro repository" -ForegroundColor Green
+    $projectRoot = $currentDir
+}
+
+# Step 6: Install Wrangler CLI
 Write-Host ""
 Write-Host "☁️  Installing Cloudflare Wrangler..." -ForegroundColor Cyan
 $wranglerInstalled = npm list -g wrangler 2>&1 | Select-String "wrangler@"
@@ -93,7 +159,7 @@ if (!$wranglerInstalled) {
     Write-Host "✅ Wrangler already installed" -ForegroundColor Green
 }
 
-# Step 5: Install VS Code Extensions (if not skipped)
+# Step 7: Install VS Code Extensions (if not skipped)
 if (!$SkipVSCodeExtensions -and (Get-Command code -ErrorAction SilentlyContinue)) {
     Write-Host ""
     Write-Host "🔌 Installing VS Code Extensions..." -ForegroundColor Cyan
@@ -122,10 +188,11 @@ if (!$SkipVSCodeExtensions -and (Get-Command code -ErrorAction SilentlyContinue)
     }
 }
 
-# Step 6: Set up Python virtual environment
+# Step 8: Set up Python virtual environment
 Write-Host ""
 Write-Host "🐍 Setting up Python environment..." -ForegroundColor Cyan
-$projectRoot = Split-Path -Parent $PSScriptRoot
+
+# Make sure we're in the project root
 Set-Location $projectRoot
 
 if (!(Test-Path ".venv")) {
@@ -145,7 +212,7 @@ if (Test-Path "backend\requirements.txt") {
     Write-Host "✅ Python packages installed" -ForegroundColor Green
 }
 
-# Step 7: Install Node.js dependencies
+# Step 9: Install Node.js dependencies
 Write-Host ""
 Write-Host "📦 Installing Node.js dependencies..." -ForegroundColor Cyan
 
@@ -192,7 +259,7 @@ if (Test-Path "integrations\cloudflare\package.json") {
     Write-Host "  ✅ Cloudflare dependencies installed" -ForegroundColor Green
 }
 
-# Step 8: Create .env file if missing
+# Step 10: Create .env file if missing
 Write-Host ""
 Write-Host "⚙️  Checking environment configuration..." -ForegroundColor Cyan
 if (!(Test-Path "backend\.env")) {
@@ -211,21 +278,19 @@ RESEND_API_KEY=your-resend-api-key-here
     Write-Host "✅ backend\.env already exists" -ForegroundColor Green
 }
 
-# Step 9: Summary
+# Step 11: Summary
 Write-Host ""
 Write-Host "=================================" -ForegroundColor Cyan
 Write-Host "✅ FitTrack Pro Setup Complete!" -ForegroundColor Green
 Write-Host "=================================" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "📋 Next Steps:" -ForegroundColor Yellow
+Write-Host "� Project Location: $projectRoot" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "�📋 Next Steps:" -ForegroundColor Yellow
 Write-Host "  1. Update backend\.env with your API keys" -ForegroundColor White
 Write-Host "  2. Run 'wrangler login' to authenticate with Cloudflare" -ForegroundColor White
-Write-Host "  3. Deploy trainer portal: 'cd integrations\cloudflare\fittrack-trainer; npx wrangler deploy'" -ForegroundColor White
-Write-Host "  4. Start backend: 'cd backend; python -m uvicorn app.main:app --reload'" -ForegroundColor White
+Write-Host "  3. Run '.\execute-fittrack.ps1' to start all services" -ForegroundColor White
 Write-Host ""
-Write-Host "🎯 Quick Commands:" -ForegroundColor Yellow
-Write-Host "  Backend:        cd backend; uvicorn app.main:app --reload" -ForegroundColor White
-Write-Host "  Web Client:     cd web-client; npm run dev" -ForegroundColor White
-Write-Host "  Desktop App:    cd desktop-app; npm run dev" -ForegroundColor White
-Write-Host "  Deploy Trainer: cd integrations\cloudflare\fittrack-trainer; npx wrangler deploy" -ForegroundColor White
+Write-Host "🎯 Or run execute-fittrack.ps1 to start everything automatically!" -ForegroundColor Yellow
+Write-Host "  Just say 'execute Project Fittrack' in GitHub Copilot Chat" -ForegroundColor White
 Write-Host ""
