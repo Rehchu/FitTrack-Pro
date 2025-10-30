@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { TrainerSignup } from '../onboarding/TrainerSignup.jsx';
 import { ClientProfile } from './ClientProfile.jsx';
 import { EmailSettings } from './EmailSettings.jsx';
+import { SettingsPage } from './SettingsPage.jsx';
 import './styles.css';
 const { ipcRenderer, clipboard } = window.require('electron');
 
@@ -13,6 +14,7 @@ function App() {
   const [clients, setClients] = useState([]);
   const [showEmail, setShowEmail] = useState(false);
   const [showEmailSettings, setShowEmailSettings] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [activeClient, setActiveClient] = useState(null);
   const [viewingClient, setViewingClient] = useState(null);
   const [emailSubject, setEmailSubject] = useState('Your plan');
@@ -278,9 +280,14 @@ function App() {
             </div>
           )}
         </div>
-        <button onClick={() => setShowEmailSettings(true)} style={{ height: 40 }}>
-          ⚙️ Email Settings
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={() => setShowSettings(true)} style={{ height: 40 }}>
+            ⚙️ Settings
+          </button>
+          <button onClick={() => setShowEmailSettings(true)} style={{ height: 40 }}>
+            📧 Email Settings
+          </button>
+        </div>
       </div>
 
       <div className="row" style={{ marginTop: 12, marginBottom: 16 }}>
@@ -368,6 +375,14 @@ function App() {
         <EmailSettings 
           apiBase={apiBase}
           onClose={() => setShowEmailSettings(false)}
+        />
+      )}
+
+      {showSettings && (
+        <SettingsPage 
+          trainerId={trainerConfig?.id}
+          apiBase={apiBase}
+          onClose={() => setShowSettings(false)}
         />
       )}
     </div>

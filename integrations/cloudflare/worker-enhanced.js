@@ -255,6 +255,164 @@ export default {
         return Response.redirect(`${url.origin}/profile/${token}`, 301);
       }
 
+      // ==================== TRAINER PORTAL & MANAGEMENT ====================
+      
+      // Unique trainer portal: /trainer/{trainerId}
+      if (path.startsWith('/trainer/')) {
+        const trainerId = path.split('/')[2];
+        if (!trainerId) {
+          return jsonResponse({ error: 'Trainer ID required' }, corsHeaders, 400);
+        }
+        
+        // Get trainer profile from D1
+        const trainer = await env.FITTRACK_D1.prepare(
+          'SELECT id, name, email, logo_url, profile_completed FROM trainers WHERE id = ?'
+        ).bind(trainerId).first();
+        
+        if (!trainer) {
+          return new Response('Trainer not found', { status: 404, headers: corsHeaders });
+        }
+        
+        // Check if profile is completed
+        if (!trainer.profile_completed) {
+          return new Response('Trainer profile not completed. Please complete your profile in the desktop app.', {
+            status: 403,
+            headers: { ...corsHeaders, 'Content-Type': 'text/html' }
+          });
+        }
+        
+        // Redirect to web client trainer dashboard with auth
+        return Response.redirect(`${url.origin}/trainer-portal?id=${trainerId}`, 302);
+      }
+      
+      // Get trainer profile: GET /api/trainers/{id}/profile
+      if (path.match(/^\/api\/trainers\/\d+\/profile$/) && req.method === 'GET') {
+        const trainerId = path.split('/')[3];
+        
+        const trainer = await env.FITTRACK_D1.prepare(
+          'SELECT id, name, email, logo_url, profile_completed, created_at FROM trainers WHERE id = ?'
+        ).bind(trainerId).first();
+        
+        if (!trainer) {
+          return jsonResponse({ error: 'Trainer not found' }, corsHeaders, 404);
+        }
+        
+        return jsonResponse(trainer, corsHeaders);
+      }
+      
+      // Update trainer profile: PUT /api/trainers/{id}/profile
+      if (path.match(/^\/api\/trainers\/\d+\/profile$/) && req.method === 'PUT') {
+        const trainerId = path.split('/')[3];
+        
+        // Handle multipart form data for logo upload
+        const contentType = req.headers.get('Content-Type') || '';
+        let logoUrl = null;
+        let name = null;
+        
+        if (contentType.includes('multipart/form-data')) {
+          const formData = await req.formData();
+          const logoFile = formData.get('logo');
+          name = formData.get('name');
+          
+          if (logoFile && env.R2_UPLOADS) {
+            // Upload logo to R2
+            const ext = logoFile.name.split('.').pop();
+            const logoKey = `trainers/${trainerId}/logo-${Date.now()}.${ext}`;
+            
+            await env.R2_UPLOADS.put(logoKey, logoFile.stream(), {
+              httpMetadata: { contentType: logoFile.type }
+            });
+            
+            logoUrl = `${url.origin}/api/uploads/${logoKey}`;
+          }
+        } else {
+          const body = await req.json();
+          name = body.name;
+          logoUrl = body.logo_url;
+        }
+        
+        // Update trainer in D1
+        const updates = [];
+        const values = [];
+        
+        if (name) {
+          updates.push('name = ?');
+          values.push(name);
+        }
+        
+        if (logoUrl) {
+          updates.push('logo_url = ?');
+          values.push(logoUrl);
+        }
+        
+        if (updates.length > 0) {
+          values.push(trainerId);
+          await env.FITTRACK_D1.prepare(
+            `UPDATE trainers SET ${updates.join(', ')} WHERE id = ?`
+          ).bind(...values).run();
+        }
+        
+        // Check if profile is now complete
+        const trainer = await env.FITTRACK_D1.prepare(
+          'SELECT id, name, email, logo_url FROM trainers WHERE id = ?'
+        ).bind(trainerId).first();
+        
+        const profileCompleted = !!(trainer.name && trainer.email && trainer.logo_url);
+        
+        if (profileCompleted) {
+          await env.FITTRACK_D1.prepare(
+            'UPDATE trainers SET profile_completed = 1 WHERE id = ?'
+          ).bind(trainerId).run();
+        }
+        
+        return jsonResponse({ 
+          success: true, 
+          profile_completed: profileCompleted,
+          logo_url: logoUrl || trainer.logo_url
+        }, corsHeaders);
+      }
+      
+      // Change trainer password: PUT /api/trainers/{id}/password
+      if (path.match(/^\/api\/trainers\/\d+\/password$/) && req.method === 'PUT') {
+        const trainerId = path.split('/')[3];
+        const { currentPassword, newPassword } = await req.json();
+        
+        if (!currentPassword || !newPassword) {
+          return jsonResponse({ error: 'Current and new passwords required' }, corsHeaders, 400);
+        }
+        
+        if (newPassword.length < 8) {
+          return jsonResponse({ error: 'Password must be at least 8 characters' }, corsHeaders, 400);
+        }
+        
+        // Get trainer's current password hash
+        const trainer = await env.FITTRACK_D1.prepare(
+          'SELECT password_hash FROM trainers WHERE id = ?'
+        ).bind(trainerId).first();
+        
+        if (!trainer) {
+          return jsonResponse({ error: 'Trainer not found' }, corsHeaders, 404);
+        }
+        
+        // Verify current password (in production, use bcrypt)
+        // For now, simple check - you should implement proper password hashing
+        const currentHash = await hashPassword(currentPassword);
+        
+        if (currentHash !== trainer.password_hash) {
+          return jsonResponse({ error: 'Current password is incorrect' }, corsHeaders, 401);
+        }
+        
+        // Hash new password
+        const newHash = await hashPassword(newPassword);
+        
+        // Update password
+        await env.FITTRACK_D1.prepare(
+          'UPDATE trainers SET password_hash = ? WHERE id = ?'
+        ).bind(newHash, trainerId).run();
+        
+        return jsonResponse({ success: true, message: 'Password updated successfully' }, corsHeaders);
+      }
+
       // ==================== ANALYTICS DASHBOARD ====================
       
       // Get analytics for trainer
@@ -1122,5 +1280,14 @@ self.addEventListener('fetch', (event) => {
   );
 });
 `;
+}
+
+// Simple password hashing using Web Crypto API
+async function hashPassword(password) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 

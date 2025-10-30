@@ -36,7 +36,9 @@
       }
     ],
     "win": {
-      "target": ["nsis"],
+      "target": [
+        "nsis"
+      ],
       "icon": "build/icon.ico"
     },
     "nsis": {
@@ -50,8 +52,9 @@
   "dependencies": {
     "axios": "^1.6.0",
     "bcrypt": "^5.1.1",
-    "lottie-react": "^2.4.0",
     "electron-store": "^8.1.0",
+    "lottie-react": "^2.4.0",
+    "qrcode": "^1.5.4",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
@@ -63,5 +66,3 @@
     "vite": "^5.0.0"
   }
 }
-
-
