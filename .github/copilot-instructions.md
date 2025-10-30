@@ -10,20 +10,34 @@ This file defines how GitHub Copilot should respond to natural language commands
 
 **Agent should do**:
 1. Run `execute-fittrack.ps1` using the `run_in_terminal` tool
-2. The script will:
-   - Check if first-time setup is needed (run auto-setup.ps1)
-   - Activate Python virtual environment
-   - Start Docker if needed
-   - Start backend API server (port 8000)
-   - Start web client dev server (port 5173)
-   - Open VS Code with the project
-   - Open browser to http://localhost:5173
-   - Display interactive menu
+2. The script will AUTOMATICALLY:
+   - **First-time setup** (if never run before):
+     - Request admin privileges if needed
+     - Run auto-setup.ps1 to install ALL prerequisites:
+       - Chocolatey package manager
+       - Git, Node.js, Python, VS Code, Docker Desktop
+       - Wrangler CLI
+       - All 40+ VS Code extensions
+       - Python virtual environment
+       - All dependencies (pip, npm)
+     - Create .env template files
+     - Mark setup as complete
+   - **Every time**:
+     - Check for required tools
+     - Activate Python virtual environment
+     - Start Docker if needed
+     - Start backend API server (port 8000)
+     - Start web client dev server (port 5173)
+     - Open VS Code with the project
+     - Open browser to http://localhost:5173
+     - Display interactive menu
 
 **Command to execute**:
 ```powershell
 cd "E:\FitTrack Pro 1.1" ; .\execute-fittrack.ps1
 ```
+
+**Important**: This is the ONLY command the user needs. Everything else is automatic!
 
 ---
 
@@ -354,5 +368,52 @@ The user should NEVER have to:
 - Remember port numbers
 - Navigate directories
 - Look up syntax
+- Install prerequisites manually
+- Run multiple setup scripts
+- Configure environment files
+- Install VS Code extensions one by one
+
+**EVERYTHING happens automatically with ONE command: "execute Project Fittrack"**
 
 Just talk naturally, and the agent handles everything! 🚀
+
+---
+
+## Implementation Details
+
+### First-Time Setup Flow:
+1. User says "execute Project Fittrack"
+2. Agent runs execute-fittrack.ps1
+3. Script detects no .fittrack-setup-complete marker
+4. Script requests admin privileges (if needed)
+5. Script runs auto-setup.ps1 which:
+   - Installs Chocolatey
+   - Installs Git, Node.js, Python, VS Code, Docker
+   - Installs Wrangler CLI  
+   - Installs all 40+ VS Code extensions
+   - Creates Python venv
+   - Installs all pip dependencies
+   - Installs all npm dependencies (root, backend, web-client, desktop-app, cloudflare)
+   - Creates .env template
+6. Script creates .fittrack-setup-complete marker
+7. Script asks about restart (if Docker needs it)
+8. Done! Or continues to start services
+
+### Subsequent Runs:
+1. User says "execute Project Fittrack"
+2. Agent runs execute-fittrack.ps1
+3. Script sees .fittrack-setup-complete marker
+4. Script skips setup, goes straight to:
+   - Activate venv
+   - Start Docker
+   - Start backend
+   - Start web client
+   - Open VS Code
+   - Open browser
+   - Show menu
+
+### Error Recovery:
+- Missing tools detected → Clear instructions to re-run setup
+- Port conflicts → Suggest stopping services
+- Docker not running → Auto-start Docker Desktop
+- No admin rights → Auto-request elevation

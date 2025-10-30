@@ -1,7 +1,10 @@
 # FitTrack Pro - One-Command Executor
 # This is the script that runs when you say "execute Project Fittrack"
 
-Write-Host "🚀 Executing Project FitTrack..." -ForegroundColor Cyan
+Write-Host ""
+Write-Host "╔═══════════════════════════════════════════╗" -ForegroundColor Cyan
+Write-Host "║     🚀 FitTrack Pro - Auto Executor      ║" -ForegroundColor Cyan
+Write-Host "╚═══════════════════════════════════════════╝" -ForegroundColor Cyan
 Write-Host ""
 
 # Determine the project root directory
@@ -16,8 +19,8 @@ if (Test-Path (Join-Path $scriptDir ".git")) {
     $projectRoot = "E:\FitTrack Pro 1.1"
     if (!(Test-Path $projectRoot)) {
         Write-Host "❌ Could not find FitTrack Pro project directory" -ForegroundColor Red
-        Write-Host "Please run this script from the project root directory" -ForegroundColor Yellow
-        Write-Host "Or use the bootstrap script to clone the repository" -ForegroundColor Yellow
+        Write-Host "💡 Tip: Run bootstrap script to set up on a fresh machine" -ForegroundColor Yellow
+        Write-Host "   Say 'bootstrap fittrack' in GitHub Copilot Chat" -ForegroundColor Yellow
         exit 1
     }
 }
@@ -31,23 +34,75 @@ $setupMarker = "$projectRoot\.fittrack-setup-complete"
 
 if (!(Test-Path $setupMarker)) {
     Write-Host "🔧 First-time setup detected. Running auto-setup..." -ForegroundColor Yellow
+    Write-Host "   This will install all prerequisites and dependencies" -ForegroundColor Cyan
     Write-Host ""
     
+    # Check if we need admin rights
+    $currentUser = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
+    $isAdmin = $currentUser.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+    
+    if (!$isAdmin) {
+        Write-Host "⚠️  Administrator rights needed for first-time setup" -ForegroundColor Yellow
+        Write-Host "🔄 Relaunching with admin privileges..." -ForegroundColor Yellow
+        Start-Process powershell.exe -Verb RunAs -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Wait
+        exit
+    }
+    
     # Run the auto-setup script
-    & "$projectRoot\scripts\auto-setup.ps1"
+    if (Test-Path "$projectRoot\scripts\auto-setup.ps1") {
+        & "$projectRoot\scripts\auto-setup.ps1"
+    } else {
+        Write-Host "❌ auto-setup.ps1 not found" -ForegroundColor Red
+        Write-Host "💡 Try running bootstrap script instead" -ForegroundColor Yellow
+        exit 1
+    }
     
     # Create marker file
     Get-Date | Out-File -FilePath $setupMarker
     
     Write-Host ""
-    Write-Host "⚠️  Some installations may require a system restart" -ForegroundColor Yellow
-    Write-Host "After restart, run this command again to start the services" -ForegroundColor Yellow
+    Write-Host "✅ First-time setup complete!" -ForegroundColor Green
+    Write-Host ""
     
-    $restart = Read-Host "Do you want to restart now? (y/N)"
-    if ($restart -eq 'y' -or $restart -eq 'Y') {
-        Restart-Computer -Confirm
-        exit
+    # Check if restart is needed (for Docker, etc.)
+    $restartNeeded = $false
+    if (!(Get-Command docker -ErrorAction SilentlyContinue)) {
+        $restartNeeded = $true
     }
+    
+    if ($restartNeeded) {
+        Write-Host "⚠️  A system restart may be required for all features" -ForegroundColor Yellow
+        Write-Host "   (Docker Desktop and other tools)" -ForegroundColor Yellow
+        Write-Host ""
+        $restart = Read-Host "Restart now? (y/N)"
+        if ($restart -eq 'y' -or $restart -eq 'Y') {
+            Restart-Computer -Confirm
+            exit
+        }
+        Write-Host "💡 Remember to restart later for full functionality" -ForegroundColor Yellow
+        Write-Host ""
+    }
+}
+
+# Continue with normal startup
+Write-Host "🚀 Starting FitTrack Pro Services..." -ForegroundColor Green
+Write-Host ""
+
+# Continue with normal startup
+Write-Host "🚀 Starting FitTrack Pro Services..." -ForegroundColor Green
+Write-Host ""
+
+# Check for required tools
+$missingTools = @()
+if (!(Get-Command python -ErrorAction SilentlyContinue)) { $missingTools += "Python" }
+if (!(Get-Command node -ErrorAction SilentlyContinue)) { $missingTools += "Node.js" }
+if (!(Get-Command git -ErrorAction SilentlyContinue)) { $missingTools += "Git" }
+
+if ($missingTools.Count -gt 0) {
+    Write-Host "❌ Missing required tools: $($missingTools -join ', ')" -ForegroundColor Red
+    Write-Host "💡 Run auto-setup to install missing tools:" -ForegroundColor Yellow
+    Write-Host "   Delete .fittrack-setup-complete and run this script again" -ForegroundColor Yellow
+    exit 1
 }
 
 # Activate Python virtual environment
