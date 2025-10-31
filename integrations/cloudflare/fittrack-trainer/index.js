@@ -1131,6 +1131,218 @@ async function handleAPI(request, env, trainerId, path) {
   }
 
   // ========================================================================
+  // EXERCISEDB API INTEGRATION (Both databases)
+  // ========================================================================
+  
+  // Search exercises from primary ExerciseDB
+  if (path === '/api/exercises/search' && method === 'GET') {
+    const name = url.searchParams.get('name') || '';
+    const target = url.searchParams.get('target') || '';
+    const equipment = url.searchParams.get('equipment') || '';
+    const limit = parseInt(url.searchParams.get('limit') || '20', 10);
+    
+    try {
+      const apiKey = env.EXERCISEDB_API_KEY;
+      const host = env.EXERCISEDB_HOST1 || 'exercisedb.p.rapidapi.com';
+      
+      // Build query based on filters
+      let endpoint = '/exercises';
+      if (target) {
+        endpoint = `/exercises/target/${encodeURIComponent(target)}`;
+      } else if (equipment) {
+        endpoint = `/exercises/equipment/${encodeURIComponent(equipment)}`;
+      } else if (name) {
+        endpoint = `/exercises/name/${encodeURIComponent(name)}`;
+      }
+      
+      endpoint += `?limit=${limit}`;
+      
+      // Cache key
+      const cacheKey = `cache:exercise:${endpoint}`;
+      const cached = await env.FITTRACK_KV.get(cacheKey);
+      if (cached) {
+        const resp = jsonResponse(JSON.parse(cached));
+        resp.headers.set('X-Cache', 'HIT');
+        return resp;
+      }
+      
+      const response = await fetch(`https://${host}${endpoint}`, {
+        headers: {
+          'x-rapidapi-key': apiKey,
+          'x-rapidapi-host': host
+        }
+      });
+      
+      if (!response.ok) {
+        return jsonResponse({ error: 'ExerciseDB API error' }, 502);
+      }
+      
+      const exercises = await response.json();
+      
+      // Cache for 24 hours (exercise data doesn't change often)
+      await env.FITTRACK_KV.put(cacheKey, JSON.stringify(exercises), { expirationTtl: 86400 });
+      
+      const out = jsonResponse(exercises);
+      out.headers.set('X-Cache', 'MISS');
+      return out;
+    } catch (error) {
+      console.error('ExerciseDB search error:', error);
+      return jsonResponse({ error: 'Failed to search exercises' }, 500);
+    }
+  }
+  
+  // Get exercise by ID
+  if (path.startsWith('/api/exercises/') && method === 'GET') {
+    const exerciseId = path.split('/').pop();
+    
+    if (exerciseId === 'search' || exerciseId === 'targets' || exerciseId === 'equipment') {
+      // Skip, handled by other routes
+    } else {
+      try {
+        const apiKey = env.EXERCISEDB_API_KEY;
+        const host = env.EXERCISEDB_HOST1 || 'exercisedb.p.rapidapi.com';
+        
+        const cacheKey = `cache:exercise:id:${exerciseId}`;
+        const cached = await env.FITTRACK_KV.get(cacheKey);
+        if (cached) {
+          return jsonResponse(JSON.parse(cached));
+        }
+        
+        const response = await fetch(`https://${host}/exercises/exercise/${exerciseId}`, {
+          headers: {
+            'x-rapidapi-key': apiKey,
+            'x-rapidapi-host': host
+          }
+        });
+        
+        if (!response.ok) {
+          return jsonResponse({ error: 'Exercise not found' }, 404);
+        }
+        
+        const exercise = await response.json();
+        await env.FITTRACK_KV.put(cacheKey, JSON.stringify(exercise), { expirationTtl: 86400 });
+        
+        return jsonResponse(exercise);
+      } catch (error) {
+        console.error('Exercise fetch error:', error);
+        return jsonResponse({ error: 'Failed to fetch exercise' }, 500);
+      }
+    }
+  }
+  
+  // Get list of muscle targets
+  if (path === '/api/exercises/targets' && method === 'GET') {
+    try {
+      const apiKey = env.EXERCISEDB_API_KEY;
+      const host = env.EXERCISEDB_HOST1 || 'exercisedb.p.rapidapi.com';
+      
+      const cacheKey = 'cache:exercise:targetList';
+      const cached = await env.FITTRACK_KV.get(cacheKey);
+      if (cached) {
+        return jsonResponse(JSON.parse(cached));
+      }
+      
+      const response = await fetch(`https://${host}/exercises/targetList`, {
+        headers: {
+          'x-rapidapi-key': apiKey,
+          'x-rapidapi-host': host
+        }
+      });
+      
+      if (!response.ok) {
+        return jsonResponse({ error: 'Failed to fetch targets' }, 502);
+      }
+      
+      const targets = await response.json();
+      await env.FITTRACK_KV.put(cacheKey, JSON.stringify(targets), { expirationTtl: 604800 }); // 7 days
+      
+      return jsonResponse(targets);
+    } catch (error) {
+      console.error('Targets fetch error:', error);
+      return jsonResponse({ error: 'Failed to fetch targets' }, 500);
+    }
+  }
+  
+  // Get list of equipment from secondary ExerciseDB
+  if (path === '/api/exercises/equipment' && method === 'GET') {
+    try {
+      const apiKey = env.EXERCISEDB_API_KEY;
+      const host = env.EXERCISEDB_HOST2 || 'exercise-db-fitness-workout-gym.p.rapidapi.com';
+      
+      const cacheKey = 'cache:exercise:equipmentList';
+      const cached = await env.FITTRACK_KV.get(cacheKey);
+      if (cached) {
+        return jsonResponse(JSON.parse(cached));
+      }
+      
+      const response = await fetch(`https://${host}/list/equipment`, {
+        headers: {
+          'x-rapidapi-key': apiKey,
+          'x-rapidapi-host': host
+        }
+      });
+      
+      if (!response.ok) {
+        return jsonResponse({ error: 'Failed to fetch equipment' }, 502);
+      }
+      
+      const equipment = await response.json();
+      await env.FITTRACK_KV.put(cacheKey, JSON.stringify(equipment), { expirationTtl: 604800 }); // 7 days
+      
+      return jsonResponse(equipment);
+    } catch (error) {
+      console.error('Equipment fetch error:', error);
+      return jsonResponse({ error: 'Failed to fetch equipment' }, 500);
+    }
+  }
+  
+  // Search exercises from secondary database
+  if (path === '/api/exercises/search/advanced' && method === 'GET') {
+    const bodyPart = url.searchParams.get('bodyPart') || '';
+    const equipment = url.searchParams.get('equipment') || '';
+    const limit = parseInt(url.searchParams.get('limit') || '20', 10);
+    
+    try {
+      const apiKey = env.EXERCISEDB_API_KEY;
+      const host = env.EXERCISEDB_HOST2 || 'exercise-db-fitness-workout-gym.p.rapidapi.com';
+      
+      let endpoint = '/exercises';
+      if (bodyPart) {
+        endpoint = `/bodyPart/${encodeURIComponent(bodyPart)}`;
+      } else if (equipment) {
+        endpoint = `/equipment/${encodeURIComponent(equipment)}`;
+      }
+      
+      const cacheKey = `cache:exercise:advanced:${endpoint}`;
+      const cached = await env.FITTRACK_KV.get(cacheKey);
+      if (cached) {
+        const data = JSON.parse(cached);
+        // Apply limit client-side
+        return jsonResponse(data.slice(0, limit));
+      }
+      
+      const response = await fetch(`https://${host}${endpoint}`, {
+        headers: {
+          'x-rapidapi-key': apiKey,
+          'x-rapidapi-host': host
+        }
+      });
+      
+      if (!response.ok) {
+        return jsonResponse({ error: 'ExerciseDB API error' }, 502);
+      }
+      
+      const exercises = await response.json();
+      await env.FITTRACK_KV.put(cacheKey, JSON.stringify(exercises), { expirationTtl: 86400 });
+      
+      return jsonResponse(exercises.slice(0, limit));
+    } catch (error) {
+      console.error('Advanced exercise search error:', error);
+      return jsonResponse({ error: 'Failed to search exercises' }, 500);
+    }
+  }
+
+  // ========================================================================
   // CLIENT MANAGEMENT
   // ========================================================================
   

@@ -37,6 +37,9 @@ ALLOWED_ORIGINS = "*"
 RL_AUTH_PER_MINUTE = "8"
 RL_USDA_PER_MINUTE = "5"
 MAX_UPLOAD_MB = "5"
+EXERCISEDB_API_KEY = "01a44cbd89msh864c4e87aba2d22p10f83cjsn2bea18eb05ec"
+EXERCISEDB_HOST1 = "exercisedb.p.rapidapi.com"
+EXERCISEDB_HOST2 = "exercise-db-fitness-workout-gym.p.rapidapi.com"
 
 [observability]
 enabled = true
