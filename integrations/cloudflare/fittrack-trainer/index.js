@@ -78,6 +78,13 @@ export default {
       });
     }
 
+    // Cyberpunk sample UI window (for design preview)
+    if (path === '/ui-demo' && request.method === 'GET') {
+      return new Response(getDemoHTML(), {
+        headers: { 'Content-Type': 'text/html; charset=UTF-8' }
+      });
+    }
+
     // Register page
     if (path === '/register' && request.method === 'GET') {
       return new Response(getRegisterHTML(), {
@@ -574,6 +581,167 @@ function rateLimitedResponse(rl) {
   r.headers.set('Retry-After', String(Math.max(1, rl.reset)));
   r.headers.set('X-RateLimit-Remaining', String(rl.remaining));
   return r;
+}
+
+// ============================================================================
+// UI DEMO (Cyberpunk-inspired theme)
+// ============================================================================
+function getDemoHTML() {
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FitTrack Pro - UI Demo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #000000;
+      --panel: #0d0d0d;
+      --panel-dark: #0a0a0a;
+      --text: #e0e0e0;
+      --heading: #ffffff;
+      --green: #00ff41;
+      --green-alt: #39ff14;
+      --purple: #b026ff;
+      --purple-alt: #9d4edd;
+      --border: #1f1f1f;
+      --glow-green: 0 0 12px rgba(0,255,65,0.35), 0 0 28px rgba(0,255,65,0.2);
+      --glow-purple: 0 0 12px rgba(176,38,255,0.35), 0 0 28px rgba(176,38,255,0.2);
+      --shadow: 0 10px 30px rgba(0,0,0,0.6);
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      display: grid;
+      grid-template-rows: 56px 1fr;
+    }
+    /* Title bar */
+    .titlebar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      background: linear-gradient(90deg, rgba(176,38,255,0.08), rgba(0,255,65,0.08));
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(4px);
+    }
+    .titlebar .app-name { color: var(--heading); font-weight: 800; letter-spacing: 0.4px; }
+    .titlebar .actions { display: flex; gap: 8px; }
+    .icon-btn { background: #111; border: 1px solid var(--border); color: var(--text); padding: 8px 10px; border-radius: 8px; cursor: pointer; }
+    .icon-btn:hover { border-color: var(--green); box-shadow: var(--glow-green); color: var(--heading); }
+    .icon-btn:active { background: var(--purple); color: #fff; box-shadow: var(--glow-purple); }
+
+    /* Layout */
+    .layout { display: grid; grid-template-columns: 240px 1fr; height: 100%; }
+    .sidebar {
+      background: var(--panel);
+      border-right: 1px solid var(--border);
+      padding: 16px 12px;
+    }
+    .menu { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+    .menu-item { padding: 10px 12px; border-radius: 10px; display: flex; align-items: center; gap: 10px; cursor: pointer; color: var(--text); border: 1px solid transparent; }
+    .menu-item:hover { border-color: var(--green); box-shadow: var(--glow-green); }
+    .menu-item.active { background: var(--purple); color: #fff; box-shadow: var(--glow-purple); border-color: transparent; }
+
+    .content {
+      background: radial-gradient(1200px 600px at 80% -20%, rgba(0,255,65,0.05), transparent),
+                  radial-gradient(800px 400px at 10% 110%, rgba(176,38,255,0.06), transparent),
+                  var(--bg);
+      padding: 20px;
+      overflow: auto;
+    }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+    .card { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+    .card h3 { color: var(--heading); margin: 0 0 8px; font-weight: 700; }
+    .muted { color: #bdbdbd; font-size: 0.95rem; }
+
+    /* Controls */
+    .toolbar { display: flex; gap: 12px; align-items: center; margin: 18px 0; }
+    .btn { background: #1a1a1a; color: var(--text); border: 1px solid var(--border); padding: 10px 14px; border-radius: 10px; font-weight: 600; cursor: pointer; transition: all .15s ease; }
+    .btn:hover { background: var(--green); color: #000; border-color: var(--green); box-shadow: var(--glow-green); }
+    .btn:active, .btn.selected { background: var(--purple); color: #fff; box-shadow: var(--glow-purple); }
+    .btn-outline { background: transparent; border: 1px solid var(--green); color: var(--green); }
+    .btn-outline:hover { background: rgba(0,255,65,0.15); color: #00d938; box-shadow: var(--glow-green); }
+
+    .input {
+      background: #000; color: var(--text); border: 1px solid var(--border); padding: 10px 12px; border-radius: 10px; min-width: 260px;
+      caret-color: var(--purple);
+    }
+    .input:focus { outline: none; border-color: var(--green); box-shadow: 0 0 0 2px rgba(0,255,65,0.25), var(--glow-green); }
+
+    .panel { background: var(--panel-dark); border: 1px solid var(--border); border-radius: 14px; padding: 16px; }
+    .panel h2 { color: var(--heading); margin: 0 0 12px; font-size: 1.1rem; letter-spacing: .3px; }
+
+    .footer { margin-top: 16px; color: #9e9e9e; font-size: 0.85rem; }
+
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; }
+      .sidebar { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="titlebar">
+    <div class="app-name">FitTrack Pro</div>
+    <div class="actions">
+      <button class="icon-btn" onclick="toggleActive()">Toggle Active</button>
+      <a class="icon-btn" href="/login">Go to Login</a>
+    </div>
+  </div>
+  <div class="layout">
+    <aside class="sidebar">
+      <ul class="menu">
+        <li class="menu-item active">🏠 Dashboard</li>
+        <li class="menu-item">👥 Clients</li>
+        <li class="menu-item">📏 Measurements</li>
+        <li class="menu-item">🍎 Nutrition</li>
+        <li class="menu-item">💪 Workouts</li>
+        <li class="menu-item">⚙️ Settings</li>
+      </ul>
+    </aside>
+    <main class="content">
+      <div class="toolbar">
+        <input class="input" placeholder="Type and press Enter" />
+        <button class="btn">Primary</button>
+        <button class="btn btn-outline">Outline</button>
+        <button class="btn selected">Selected</button>
+      </div>
+
+      <div class="cards">
+        <div class="card">
+          <h3>Overview</h3>
+          <div class="muted">High-contrast neon theme with green and purple accents. Buttons glow on hover, and inputs have a green focus ring with a purple caret.</div>
+        </div>
+        <div class="card">
+          <h3>Status</h3>
+          <div class="panel">
+            <h2>System</h2>
+            <div class="muted">All services nominal. Cloudflare in front. Rate limits and caching enabled.</div>
+          </div>
+          <div class="footer">Cyberpunk UI • v1</div>
+        </div>
+        <div class="card">
+          <h3>Shortcuts</h3>
+          <div class="toolbar"><button class="btn">New Client</button><button class="btn">Add Workout</button></div>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script>
+    function toggleActive() {
+      const first = document.querySelector('.menu .menu-item');
+      if (first) first.classList.toggle('active');
+    }
+  </script>
+</body>
+</html>`;
 }
 
 // ============================================================================
