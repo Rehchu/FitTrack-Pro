@@ -85,6 +85,13 @@ export default {
       });
     }
 
+    // Client login page
+    if ((path === '/client/login' || path === '/client') && request.method === 'GET') {
+      return new Response(getLoginHTML('client'), {
+        headers: { 'Content-Type': 'text/html; charset=UTF-8' }
+      });
+    }
+
     // Register page
     if (path === '/register' && request.method === 'GET') {
       return new Response(getRegisterHTML(), {
@@ -607,10 +614,10 @@ function getDemoHTML() {
       --green-alt: #39ff14;
       --purple: #b026ff;
       --purple-alt: #9d4edd;
-      --border: #1f1f1f;
-      --glow-green: 0 0 12px rgba(0,255,65,0.35), 0 0 28px rgba(0,255,65,0.2);
-      --glow-purple: 0 0 12px rgba(176,38,255,0.35), 0 0 28px rgba(176,38,255,0.2);
-      --shadow: 0 10px 30px rgba(0,0,0,0.6);
+      --border: #1a1a1a;
+      --glow-green: 0 0 12px rgba(0,255,65,0.5), 0 0 28px rgba(0,255,65,0.3);
+      --glow-purple: 0 0 12px rgba(176,38,255,0.5), 0 0 28px rgba(176,38,255,0.3);
+      --shadow: 0 10px 30px rgba(0,0,0,0.8);
     }
     * { box-sizing: border-box; }
     html, body { height: 100%; }
@@ -628,53 +635,54 @@ function getDemoHTML() {
       align-items: center;
       justify-content: space-between;
       padding: 0 16px;
-      background: linear-gradient(90deg, rgba(176,38,255,0.08), rgba(0,255,65,0.08));
-      border-bottom: 1px solid var(--border);
-      backdrop-filter: blur(4px);
+      background: #000000;
+      border-bottom: 2px solid var(--green);
+      box-shadow: 0 0 20px rgba(0,255,65,0.3);
     }
-    .titlebar .app-name { color: var(--heading); font-weight: 800; letter-spacing: 0.4px; }
+    .titlebar .app-name { color: var(--heading); font-weight: 800; letter-spacing: 0.4px; text-shadow: 0 0 10px rgba(0,255,65,0.5); }
     .titlebar .actions { display: flex; gap: 8px; }
-    .icon-btn { background: #111; border: 1px solid var(--border); color: var(--text); padding: 8px 10px; border-radius: 8px; cursor: pointer; }
-    .icon-btn:hover { border-color: var(--green); box-shadow: var(--glow-green); color: var(--heading); }
-    .icon-btn:active { background: var(--purple); color: #fff; box-shadow: var(--glow-purple); }
+    .icon-btn { background: #1a1a1a; border: 1px solid var(--border); color: var(--text); padding: 8px 10px; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+    .icon-btn:hover { background: var(--green); border-color: var(--green); box-shadow: var(--glow-green); color: #000; font-weight: 600; }
+    .icon-btn:active { background: var(--purple); border-color: var(--purple); color: #fff; box-shadow: var(--glow-purple); }
 
     /* Layout */
     .layout { display: grid; grid-template-columns: 240px 1fr; height: 100%; }
     .sidebar {
-      background: var(--panel);
-      border-right: 1px solid var(--border);
+      background: #000000;
+      border-right: 2px solid var(--green);
+      box-shadow: 2px 0 20px rgba(0,255,65,0.2);
       padding: 16px 12px;
     }
     .menu { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-    .menu-item { padding: 10px 12px; border-radius: 10px; display: flex; align-items: center; gap: 10px; cursor: pointer; color: var(--text); border: 1px solid transparent; }
-    .menu-item:hover { border-color: var(--green); box-shadow: var(--glow-green); }
-    .menu-item.active { background: var(--purple); color: #fff; box-shadow: var(--glow-purple); border-color: transparent; }
+    .menu-item { padding: 10px 12px; border-radius: 10px; display: flex; align-items: center; gap: 10px; cursor: pointer; color: var(--text); border: 1px solid transparent; transition: all 0.2s; }
+    .menu-item:hover { background: #1a1a1a; border-color: var(--green); box-shadow: var(--glow-green); color: var(--heading); }
+    .menu-item.active { background: var(--purple); color: #ffffff; box-shadow: var(--glow-purple); border-color: var(--purple); font-weight: 600; }
 
     .content {
-      background: radial-gradient(1200px 600px at 80% -20%, rgba(0,255,65,0.05), transparent),
-                  radial-gradient(800px 400px at 10% 110%, rgba(176,38,255,0.06), transparent),
-                  var(--bg);
+      background: #000000;
       padding: 20px;
       overflow: auto;
     }
     .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
-    .card { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+    .card { background: #1a1a1a; border: 2px solid var(--border); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); transition: all 0.3s; }
+    .card:hover { border-color: var(--green); box-shadow: var(--glow-green), var(--shadow); }
     .card h3 { color: var(--heading); margin: 0 0 8px; font-weight: 700; }
     .muted { color: #bdbdbd; font-size: 0.95rem; }
 
     /* Controls */
     .toolbar { display: flex; gap: 12px; align-items: center; margin: 18px 0; }
-    .btn { background: #1a1a1a; color: var(--text); border: 1px solid var(--border); padding: 10px 14px; border-radius: 10px; font-weight: 600; cursor: pointer; transition: all .15s ease; }
-    .btn:hover { background: var(--green); color: #000; border-color: var(--green); box-shadow: var(--glow-green); }
-    .btn:active, .btn.selected { background: var(--purple); color: #fff; box-shadow: var(--glow-purple); }
-    .btn-outline { background: transparent; border: 1px solid var(--green); color: var(--green); }
-    .btn-outline:hover { background: rgba(0,255,65,0.15); color: #00d938; box-shadow: var(--glow-green); }
+    .btn { background: #2a2a2a; color: var(--text); border: 2px solid var(--green); padding: 10px 14px; border-radius: 10px; font-weight: 600; cursor: pointer; transition: all .2s ease; box-shadow: 0 0 10px rgba(0,255,65,0.2); }
+    .btn:hover { background: var(--green); color: #000000; border-color: var(--green); box-shadow: 0 0 25px rgba(0,255,65,0.6), 0 0 40px rgba(0,255,65,0.3); transform: translateY(-2px); }
+    .btn:active, .btn.selected { background: var(--purple); color: #ffffff; border-color: var(--purple); box-shadow: 0 0 25px rgba(176,38,255,0.6), 0 0 40px rgba(176,38,255,0.3); transform: translateY(0); }
+    .btn-outline { background: transparent; border: 2px solid var(--green); color: var(--green); box-shadow: 0 0 10px rgba(0,255,65,0.2); }
+    .btn-outline:hover { background: rgba(0,255,65,0.15); color: var(--green); border-color: var(--green-alt); box-shadow: 0 0 20px rgba(0,255,65,0.5); }
 
     .input {
-      background: #000; color: var(--text); border: 1px solid var(--border); padding: 10px 12px; border-radius: 10px; min-width: 260px;
+      background: #000000; color: var(--text); border: 2px solid var(--border); padding: 10px 12px; border-radius: 10px; min-width: 260px;
       caret-color: var(--purple);
+      transition: all 0.2s;
     }
-    .input:focus { outline: none; border-color: var(--green); box-shadow: 0 0 0 2px rgba(0,255,65,0.25), var(--glow-green); }
+    .input:focus { outline: none; border-color: var(--green); box-shadow: 0 0 0 3px rgba(0,255,65,0.25), 0 0 20px rgba(0,255,65,0.5); }
 
     .panel { background: var(--panel-dark); border: 1px solid var(--border); border-radius: 14px; padding: 16px; }
     .panel h2 { color: var(--heading); margin: 0 0 12px; font-size: 1.1rem; letter-spacing: .3px; }
@@ -1670,23 +1678,33 @@ function renderTrainerPortal(trainer) {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Trainer Portal - ${trainerName}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <style>
     :root {
-      --bg: #0f1222;
-      --panel: #1f2336;
-      --panel-dark: #161a2a;
-      --text: #e5e7eb;
-      --muted: #9ca3af;
-      --brand1: #FF4B39;
-      --brand2: #FFB82B;
-      --success: #1BB55C;
-      --border: #2f3550;
+      --bg: #000000;
+      --panel: #0d0d0d;
+      --panel-dark: #0a0a0a;
+      --text: #e0e0e0;
+      --heading: #ffffff;
+      --muted: #9e9e9e;
+      --green: #00ff41;
+      --green-alt: #39ff14;
+      --purple: #b026ff;
+      --purple-alt: #9d4edd;
+      --success: #00ff41;
+      --error: #ff4444;
+      --border: #1a1a1a;
+      --glow-green: 0 0 12px rgba(0,255,65,0.5), 0 0 28px rgba(0,255,65,0.3);
+      --glow-purple: 0 0 12px rgba(176,38,255,0.5), 0 0 28px rgba(176,38,255,0.3);
+      --shadow: 0 10px 30px rgba(0,0,0,0.8);
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: linear-gradient(135deg, #1a1d2e 0%, #2a2f42 100%);
+      font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
       color: var(--text);
       min-height: 100vh;
     }
@@ -1695,8 +1713,9 @@ function renderTrainerPortal(trainer) {
       align-items: center;
       justify-content: space-between;
       padding: 14px 20px;
-      background: var(--panel);
-      box-shadow: 0 2px 10px rgba(0,0,0,.3);
+      background: #000000;
+      border-bottom: 2px solid var(--green);
+      box-shadow: 0 0 20px rgba(0,255,65,0.3);
       position: sticky;
       top: 0;
       z-index: 100;
@@ -1704,8 +1723,8 @@ function renderTrainerPortal(trainer) {
       gap: 10px;
     }
     .header-left { display: flex; align-items: center; gap: 10px; }
-    .title { font-weight: 800; font-size: 1.2rem; }
-    .grad { background: linear-gradient(135deg, var(--brand1) 0%, var(--brand2) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .title { font-weight: 800; font-size: 1.2rem; color: var(--heading); text-shadow: 0 0 10px rgba(0,255,65,0.5); letter-spacing: 0.4px; }
+    .grad { color: var(--green); }
     .subtitle { font-size: 0.85rem; color: var(--muted); }
     .tabs {
       display: flex;
@@ -1713,11 +1732,11 @@ function renderTrainerPortal(trainer) {
       flex-wrap: wrap;
       padding: 16px 20px;
       background: var(--panel-dark);
-      border-bottom: 1px solid var(--border);
+      border-bottom: 2px solid var(--border);
     }
     .tab {
       background: transparent;
-      border: none;
+      border: 2px solid transparent;
       color: var(--muted);
       padding: 8px 16px;
       border-radius: 8px;
@@ -1725,16 +1744,16 @@ function renderTrainerPortal(trainer) {
       font-weight: 600;
       transition: all 0.2s;
     }
-    .tab:hover { background: var(--panel); color: var(--text); }
+    .tab:hover { 
+      background: #1a1a1a; 
+      color: var(--heading); 
+      border-color: var(--green); 
+      box-shadow: var(--glow-green);
+    }
     .tab.active {
-      background: linear-gradient(135deg, var(--brand1), var(--brand2));
-      color: #0f1222;
-    }
-    .container {
-      max-width: 1400px;
-      margin: 0 auto;
-      padding: 20px;
-    }
+      background: var(--purple);
+      color: #ffffff;
+      border-color: var(--purple);
     .content { display: none; }
     .content.active { display: block; }
     .card {
@@ -1742,63 +1761,98 @@ function renderTrainerPortal(trainer) {
       border-radius: 12px;
       padding: 24px;
       margin-bottom: 20px;
-      border: 1px solid var(--border);
+      border: 2px solid var(--border);
+      box-shadow: var(--shadow);
     }
     .card h2 {
       font-size: 1.5rem;
       margin-bottom: 16px;
-      background: linear-gradient(135deg, var(--brand1), var(--brand2));
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
+      color: var(--heading);
+      text-shadow: 0 0 10px rgba(0,255,65,0.3);
     }
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
     .stat-card {
-      background: linear-gradient(135deg, var(--panel-dark), var(--panel));
+      background: var(--panel-dark);
       border-radius: 12px;
       padding: 20px;
-      border: 1px solid var(--border);
+      border: 2px solid var(--border);
+      transition: all 0.3s;
+    }
+    .stat-card:hover {
+      border-color: var(--green);
+      box-shadow: var(--glow-green), var(--shadow);
     }
     .stat-value {
       font-size: 2.5rem;
       font-weight: 800;
-      background: linear-gradient(135deg, var(--brand1), var(--brand2));
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
+      color: var(--green);
+      text-shadow: 0 0 15px rgba(0,255,65,0.4);
     }
     .stat-label { color: var(--muted); margin-top: 4px; }
     input, select, textarea {
       width: 100%;
-      background: var(--bg);
+      background: #000000;
       color: var(--text);
-      border: 1px solid var(--border);
+      border: 2px solid var(--border);
       border-radius: 8px;
       padding: 10px;
       font-size: 1rem;
       margin-bottom: 12px;
+      caret-color: var(--purple);
+      transition: all 0.2s;
     }
-    input:focus, select:focus, textarea:focus { outline: none; border-color: var(--brand2); }
+    input:focus, select:focus, textarea:focus { 
+      outline: none; 
+      border-color: var(--green); 
+      box-shadow: 0 0 0 3px rgba(0,255,65,0.25), 0 0 20px rgba(0,255,65,0.5);
+    }
     .btn {
-      background: linear-gradient(135deg, var(--brand1), var(--brand2));
-      border: none;
-      color: #0f1222;
+      background: #2a2a2a;
+      border: 2px solid var(--green);
+      color: var(--heading);
       padding: 10px 20px;
       border-radius: 8px;
       font-weight: 700;
       cursor: pointer;
-      transition: opacity 0.2s;
+      transition: all 0.25s;
       font-size: 0.95rem;
+      box-shadow: 0 0 10px rgba(0,255,65,0.2);
     }
-    .btn:hover { opacity: 0.9; }
+    .btn:hover { 
+      background: var(--green);
+      color: #000000;
+      box-shadow: 0 0 25px rgba(0,255,65,0.6), 0 0 40px rgba(0,255,65,0.3);
+      transform: translateY(-2px);
+    }
+    .btn:active {
+      background: var(--purple);
+      color: #ffffff;
+      border-color: var(--purple);
+      box-shadow: 0 0 25px rgba(176,38,255,0.6), 0 0 40px rgba(176,38,255,0.3);
+      transform: translateY(0);
+    }
     .btn-secondary {
       background: var(--panel-dark);
       color: var(--text);
-      border: 1px solid var(--border);
+      border: 2px solid var(--border);
+      box-shadow: none;
+    }
+    .btn-secondary:hover {
+      background: #1a1a1a;
+      border-color: var(--green);
+      color: var(--heading);
+      box-shadow: var(--glow-green);
     }
     .btn-danger {
-      background: var(--brand1);
-      color: white;
+      background: #2a0a0a;
+      border-color: var(--error);
+      color: var(--error);
+      box-shadow: 0 0 10px rgba(255,68,68,0.2);
+    }
+    .btn-danger:hover {
+      background: var(--error);
+      color: #ffffff;
+      box-shadow: 0 0 25px rgba(255,68,68,0.6);
     }
     table {
       width: 100%;
@@ -3231,27 +3285,37 @@ function renderTrainerPortal(trainer) {
 // LOGIN PAGE HTML
 // ============================================================================
 
-function getLoginHTML() {
+function getLoginHTML(portalType = 'trainer') {
+  const title = portalType === 'client' ? 'Client Portal' : 'Trainer Portal';
+  
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Trainer Login - FitTrack Pro</title>
+  <title>${title} Login - FitTrack Pro</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg: #0f1222;
-      --panel: #1f2336;
-      --text: #e5e7eb;
-      --muted: #9ca3af;
-      --brand1: #FF4B39;
-      --brand2: #FFB82B;
-      --border: #2f3550;
+      --bg: #000000;
+      --panel: #0d0d0d;
+      --text: #e0e0e0;
+      --heading: #ffffff;
+      --green: #00ff41;
+      --green-alt: #39ff14;
+      --purple: #b026ff;
+      --purple-alt: #9d4edd;
+      --border: #1a1a1a;
+      --glow-green: 0 0 12px rgba(0,255,65,0.5), 0 0 28px rgba(0,255,65,0.3);
+      --glow-purple: 0 0 12px rgba(176,38,255,0.5), 0 0 28px rgba(176,38,255,0.3);
+      --shadow: 0 10px 30px rgba(0,0,0,0.8);
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: linear-gradient(135deg, #1a1d2e 0%, #2a2f42 100%);
+      font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
       color: var(--text);
       min-height: 100vh;
       display: flex;
@@ -3260,71 +3324,146 @@ function getLoginHTML() {
       padding: 20px;
     }
     .container {
-      max-width: 400px;
+      max-width: 420px;
       width: 100%;
       background: var(--panel);
       padding: 40px;
       border-radius: 16px;
-      border: 1px solid var(--border);
-      box-shadow: 0 4px 24px rgba(0,0,0,.4);
+      border: 2px solid var(--green);
+      box-shadow: var(--glow-green), var(--shadow);
     }
     h1 {
-      font-size: 2rem;
-      background: linear-gradient(135deg, var(--brand1), var(--brand2));
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-      margin-bottom: 10px;
+      font-size: 2.2rem;
+      color: var(--heading);
+      margin-bottom: 8px;
       text-align: center;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      text-shadow: 0 0 20px rgba(0,255,65,0.5);
     }
-    .subtitle { color: var(--muted); text-align: center; margin-bottom: 30px; }
+    .subtitle { 
+      color: var(--text); 
+      text-align: center; 
+      margin-bottom: 30px; 
+      font-size: 0.95rem;
+    }
+    .portal-badge {
+      display: inline-block;
+      background: var(--purple);
+      color: #ffffff;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      margin-bottom: 12px;
+      box-shadow: var(--glow-purple);
+    }
     input {
       width: 100%;
-      background: var(--bg);
+      background: #000000;
       color: var(--text);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 12px;
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
       font-size: 1rem;
       margin-bottom: 16px;
+      caret-color: var(--purple);
+      transition: all 0.2s;
     }
-    input:focus { outline: none; border-color: var(--brand2); }
+    input:focus { 
+      outline: none; 
+      border-color: var(--green); 
+      box-shadow: 0 0 0 3px rgba(0,255,65,0.25), 0 0 20px rgba(0,255,65,0.5);
+    }
     .btn {
       width: 100%;
-      background: linear-gradient(135deg, var(--brand1), var(--brand2));
-      border: none;
-      color: #0f1222;
+      background: #2a2a2a;
+      border: 2px solid var(--green);
+      color: var(--heading);
       padding: 14px;
       border-radius: 10px;
       font-weight: 700;
       font-size: 1rem;
       cursor: pointer;
-      transition: opacity 0.2s;
+      transition: all 0.25s;
+      box-shadow: 0 0 10px rgba(0,255,65,0.2);
     }
-    .btn:hover { opacity: 0.9; }
-    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    .error { color: var(--brand1); margin-top: 10px; font-size: 0.9rem; }
-    .success { color: var(--brand2); margin-top: 10px; font-size: 0.9rem; }
-    .link { text-align: center; margin-top: 20px; }
-    .link a { color: var(--brand2); text-decoration: none; }
-    .link a:hover { text-decoration: underline; }
+    .btn:hover { 
+      background: var(--green);
+      color: #000000;
+      box-shadow: 0 0 25px rgba(0,255,65,0.6), 0 0 40px rgba(0,255,65,0.3);
+      transform: translateY(-2px);
+    }
+    .btn:active {
+      background: var(--purple);
+      color: #ffffff;
+      border-color: var(--purple);
+      box-shadow: 0 0 25px rgba(176,38,255,0.6), 0 0 40px rgba(176,38,255,0.3);
+      transform: translateY(0);
+    }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .error { 
+      color: #ff4444; 
+      margin-top: 10px; 
+      font-size: 0.9rem; 
+      text-align: center;
+      padding: 10px;
+      background: rgba(255,68,68,0.1);
+      border-radius: 8px;
+      border: 1px solid rgba(255,68,68,0.3);
+    }
+    .success { 
+      color: var(--green); 
+      margin-top: 10px; 
+      font-size: 0.9rem; 
+      text-align: center;
+      padding: 10px;
+      background: rgba(0,255,65,0.1);
+      border-radius: 8px;
+      border: 1px solid rgba(0,255,65,0.3);
+    }
+    .link { 
+      text-align: center; 
+      margin-top: 20px;
+      color: var(--text);
+    }
+    .link a { 
+      color: var(--green); 
+      text-decoration: none;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+    .link a:hover { 
+      color: var(--green-alt);
+      text-shadow: 0 0 10px rgba(0,255,65,0.5);
+    }
   </style>
 </head>
 <body>
   <div class="container">
+    <div style="text-align: center;">
+      <span class="portal-badge">${title}</span>
+    </div>
     <h1>FitTrack Pro</h1>
-    <p class="subtitle">Trainer Portal Login</p>
+    <p class="subtitle">Welcome back</p>
     
     <form id="login-form" method="POST" action="/api/auth/login">
+      <input type="hidden" name="portal_type" value="${portalType}" />
       <input type="email" name="email" id="email" placeholder="Email" required autocomplete="email" />
       <input type="password" name="password" id="password" placeholder="Password" required autocomplete="current-password" />
       <button type="submit" class="btn" id="submit-btn">Log In</button>
       <div id="message"></div>
     </form>
 
+    ${portalType === 'trainer' ? `
     <div class="link">
       Don't have an account? <a href="/register">Register here</a>
     </div>
+    ` : `
+    <div class="link">
+      First time logging in? <a href="/reset-password">Reset your password</a>
+    </div>
+    `}
   </div>
 
   <!-- No JS needed: classic form POST for maximum compatibility -->

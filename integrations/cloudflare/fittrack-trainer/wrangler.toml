@@ -12,7 +12,7 @@ compatibility_flags = [
 [[d1_databases]]
 binding = "FITTRACK_D1"
 database_name = "fittrack-pro-db"
-database_id = "4bc69687-f28a-4be1-9a0d-d3bc0b0583d2"
+database_id = "32046a7f-9f95-4b84-a79d-b7895d0e6eae"
 
 [[r2_buckets]]
 binding = "R2_UPLOADS"
@@ -20,7 +20,7 @@ bucket_name = "fittrack-uploads"
 
 [[kv_namespaces]]
 binding = "FITTRACK_KV"
-id = "d31f5b43bd964ce78d87d9dd5878cc25"
+id = "1f558809e4d54eab84e09931e73584f9"
 
 [ai]
 binding = "AI"
