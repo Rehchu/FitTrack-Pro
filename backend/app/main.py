@@ -26,6 +26,7 @@ from .routes.ai_router import router as ai_router
 from .routes.dashboard_router import router as dashboard_router
 from .routes.usda_router import router as usda_router
 from .routes.settings_router import router as settings_router
+from .routes.auth_router import router as auth_router
 # Include legacy desktop-friendly routes (no-auth helpers)
 from .legacy_desktop import router as legacy_router
 
@@ -84,6 +85,7 @@ app.include_router(ai_router, tags=["ai-fitness"])
 app.include_router(dashboard_router, tags=["dashboard"])
 app.include_router(usda_router, tags=["usda-nutrition"])
 app.include_router(settings_router, tags=["settings"])
+app.include_router(auth_router, prefix="/auth", tags=["auth"])
 
 # Serve uploaded files (progress photos, thumbnails, workout videos)
 uploads_dir = os.path.join(os.getcwd(), "uploads")

@@ -10,24 +10,10 @@ export default {
     try {
       const url = new URL(request.url);
       const path = url.pathname;
+      const clientIp = request.headers.get('CF-Connecting-IP') || 'unknown';
 
-      return new Response(JSON.stringify({
-        debug: 'ALL REQUESTS',
-        path: path,
-        url: request.url,
-        method: request.method
-      }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
-      });
-
-      console.log('=== REQUEST START ===');
-      console.log('Method:', request.method);
-      console.log('Path:', path);
-      console.log('Path type:', typeof path);
-      console.log('Path length:', path.length);
-      console.log('Path includes /login:', path.includes('/login'));
-      console.log('Path === /login:', path === '/login');
+      // Debug logs kept minimal to avoid noisy output; remove during production if needed.
+      // console.log('Method:', request.method, 'Path:', path);
 
       // Ensure database schema exists (idempotent)
         try {
@@ -37,21 +23,13 @@ export default {
           console.error('Schema error (continuing anyway):', schemaError.message);
         }
 
-      console.log('=== REQUEST START ===');
-      console.log('Method:', request.method);
-      console.log('Path:', path);
-      console.log('Path type:', typeof path);
-      console.log('Path length:', path.length);
-      console.log('Path includes /login:', path.includes('/login'));
-      console.log('Path === /login:', path === '/login');
-
       // Ensure database schema exists (idempotent)
-        try {
-          await ensureSchema(env);
-          console.log('Schema ensured successfully');
-        } catch (schemaError) {
-          console.error('Schema error (continuing anyway):', schemaError.message);
-        }
+      try {
+        await ensureSchema(env);
+        // console.log('Schema ensured successfully');
+      } catch (schemaError) {
+        console.error('Schema error (continuing anyway):', schemaError.message);
+      }
 
     // Handle CORS preflight
     if (request.method === 'OPTIONS') {
@@ -77,6 +55,17 @@ export default {
          path === '/rainer/login' || 
          path.includes('/login'));
     console.log('Path:', path, 'isLoginPath:', isLoginPath, 'method:', request.method);
+    
+    // Cost guard: Optional per-IP rate limit for auth endpoints to prevent abuse/brute-force.
+    if (isLoginPath || path.startsWith('/api/auth/')) {
+      const limit = getEnvInt(env.RL_AUTH_PER_MINUTE, 8); // default 8/min per IP
+      if (limit > 0) {
+        const rl = await rateLimit(env, 'auth', clientIp, limit, 60);
+        if (rl.limited) {
+          return rateLimitedResponse(rl);
+        }
+      }
+    }
     
     if (isLoginPath && request.method === 'GET') {
       console.log('Serving login page for path:', path);
@@ -552,6 +541,41 @@ function jsonResponse(data, status = 200) {
   });
 }
 
+// ============================
+// COST GUARD HELPERS
+// ============================
+function getEnvInt(val, fallback) {
+  const n = parseInt(val, 10);
+  return Number.isFinite(n) && n >= 0 ? n : fallback;
+}
+
+async function rateLimit(env, bucket, key, limit, windowSec) {
+  const now = Math.floor(Date.now() / 1000);
+  const win = Math.floor(now / windowSec);
+  const kvKey = `rl:${bucket}:${key}:${win}`;
+  const reset = (win + 1) * windowSec - now;
+  try {
+    const existing = await env.FITTRACK_KV.get(kvKey, { type: 'text' });
+    const count = existing ? parseInt(existing, 10) || 0 : 0;
+    if (count >= limit) {
+      return { limited: true, remaining: 0, reset };
+    }
+    // Increment (not atomic, but good enough for coarse limits)
+    await env.FITTRACK_KV.put(kvKey, String(count + 1), { expirationTtl: reset + 5 });
+    return { limited: false, remaining: Math.max(0, limit - (count + 1)), reset };
+  } catch (e) {
+    // On KV error, fail-open (no limit) to preserve availability
+    return { limited: false, remaining: limit, reset };
+  }
+}
+
+function rateLimitedResponse(rl) {
+  const r = jsonResponse({ error: 'Too Many Requests' }, 429);
+  r.headers.set('Retry-After', String(Math.max(1, rl.reset)));
+  r.headers.set('X-RateLimit-Remaining', String(rl.remaining));
+  return r;
+}
+
 // ============================================================================
 // CONVERSION HELPERS
 // ============================================================================
@@ -870,6 +894,22 @@ async function handleAPI(request, env, trainerId, path) {
     const pageNumber = parseInt(url.searchParams.get('page_number') || '1', 10);
     if (!q) return jsonResponse({ error: 'Missing query parameter q' }, 400);
     try {
+      // Cost guard: per-IP rate limit for USDA to avoid excessive external API calls
+      const usdaLimit = getEnvInt(env.RL_USDA_PER_MINUTE, 5); // default 5/min per IP
+      if (usdaLimit > 0) {
+        const rl = await rateLimit(env, 'usda', clientIp, usdaLimit, 60);
+        if (rl.limited) return rateLimitedResponse(rl);
+      }
+
+      // KV cache for USDA results to reduce repeated external calls
+      const cacheKey = `cache:usda:q=${q}:ps=${pageSize}:pn=${pageNumber}`;
+      const cached = await env.FITTRACK_KV.get(cacheKey);
+      if (cached) {
+        const resp = jsonResponse(JSON.parse(cached));
+        resp.headers.set('X-Cache', 'HIT');
+        return resp;
+      }
+      
       const apiKey = env.USDA_API_KEY || 'DEMO_KEY';
       const usdaUrl = `https://api.nal.usda.gov/fdc/v1/foods/search?query=${encodeURIComponent(q)}&pageSize=${pageSize}&pageNumber=${pageNumber}&api_key=${encodeURIComponent(apiKey)}`;
       const resp = await fetch(usdaUrl, { headers: { 'accept': 'application/json' } });
@@ -904,7 +944,12 @@ async function handleAPI(request, env, trainerId, path) {
           sodium: nutrients.sodium || 0,
         };
       });
-      return jsonResponse({ query: q, totalHits: data.totalHits || 0, currentPage: pageNumber, totalPages: data.totalPages || 0, foods });
+      const payload = { query: q, totalHits: data.totalHits || 0, currentPage: pageNumber, totalPages: data.totalPages || 0, foods };
+      // Cache for 6 hours to control cost
+      await env.FITTRACK_KV.put(cacheKey, JSON.stringify(payload), { expirationTtl: 21600 });
+      const out = jsonResponse(payload);
+      out.headers.set('X-Cache', 'MISS');
+      return out;
     } catch (e) {
       console.error('USDA search error', e);
       return jsonResponse({ error: 'Failed to search USDA' }, 500);
@@ -1373,6 +1418,14 @@ async function handleAPI(request, env, trainerId, path) {
       const clientId = form.get('clientId');
       const note = form.get('note');
       if (!file || !clientId) return jsonResponse({ error: 'file and clientId required' }, 400);
+      // Enforce upload size limit to avoid R2 overage
+      const maxMb = getEnvInt(env.MAX_UPLOAD_MB, 5);
+      const maxBytes = maxMb * 1024 * 1024;
+      if (typeof file.size === 'number' && file.size > maxBytes) {
+        const r = jsonResponse({ error: `File too large. Max ${maxMb} MB` }, 413);
+        r.headers.set('Retry-After', '60');
+        return r;
+      }
       const owns = await env.FITTRACK_D1.prepare('SELECT id FROM clients WHERE id = ? AND trainer_id = ?').bind(clientId, trainerId).first();
       if (!owns) return jsonResponse({ error: 'Not found' }, 404);
       const filename = `photos/${clientId}/${Date.now()}_${file.name}`;

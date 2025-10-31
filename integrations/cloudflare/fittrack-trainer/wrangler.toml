@@ -34,6 +34,9 @@ dataset = "fittrack_trainer_events"
 [vars]
 ENVIRONMENT = "production"
 ALLOWED_ORIGINS = "*"
+RL_AUTH_PER_MINUTE = "8"
+RL_USDA_PER_MINUTE = "5"
+MAX_UPLOAD_MB = "5"
 
 [observability]
 enabled = true
