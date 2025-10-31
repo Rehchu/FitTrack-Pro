@@ -11,7 +11,6 @@ export default {
       const url = new URL(request.url);
       const path = url.pathname;
 
-      // TEMPORARY DEBUG FOR ALL REQUESTS
       return new Response(JSON.stringify({
         debug: 'ALL REQUESTS',
         path: path,
@@ -21,6 +20,22 @@ export default {
         status: 200,
         headers: { 'Content-Type': 'application/json' }
       });
+
+      console.log('=== REQUEST START ===');
+      console.log('Method:', request.method);
+      console.log('Path:', path);
+      console.log('Path type:', typeof path);
+      console.log('Path length:', path.length);
+      console.log('Path includes /login:', path.includes('/login'));
+      console.log('Path === /login:', path === '/login');
+
+      // Ensure database schema exists (idempotent)
+        try {
+          await ensureSchema(env);
+          console.log('Schema ensured successfully');
+        } catch (schemaError) {
+          console.error('Schema error (continuing anyway):', schemaError.message);
+        }
 
       console.log('=== REQUEST START ===');
       console.log('Method:', request.method);
@@ -103,7 +118,6 @@ export default {
     // Authenticate trainer
     const trainer = await authenticateTrainer(request, env);
 
-    // Redirect to login if not authenticated
     if (!trainer && !path.startsWith('/api/') && !path.startsWith('/uploads/')) {
       // If not authenticated, always show login page for login-related paths or home
       if (path === '/' || path.includes('/login')) {
@@ -112,6 +126,23 @@ export default {
         });
       }
       // For any other path, redirect to /login
+      return Response.redirect(new URL('/login', request.url).toString(), 302);
+    }
+    // Redirect to login if not authenticated
+    if (!trainer && !path.startsWith('/api/') && !path.startsWith('/uploads/')) {
+      // If not authenticated and already on a login page, always serve login page (never redirect)
+      const loginPaths = ['/login', '/trainer/login', '/login/trainer', '/rainer/login'];
+      if (loginPaths.includes(path) || path === '/' || path.includes('/login')) {
+        return new Response(getLoginHTML(), {
+          headers: {
+            'Content-Type': 'text/html; charset=UTF-8',
+            'X-Debug-Path': path,
+            'X-Debug-Auth': 'unauthenticated',
+            'X-Debug-Login-Logic': 'served-login-page-no-redirect'
+          }
+        });
+      }
+      // For any other path, redirect to /login (but never from /login itself)
       return Response.redirect(new URL('/login', request.url).toString(), 302);
     }
 
