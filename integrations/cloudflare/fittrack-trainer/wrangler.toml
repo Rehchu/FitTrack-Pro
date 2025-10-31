@@ -40,6 +40,9 @@ MAX_UPLOAD_MB = "5"
 EXERCISEDB_API_KEY = "01a44cbd89msh864c4e87aba2d22p10f83cjsn2bea18eb05ec"
 EXERCISEDB_HOST1 = "exercisedb.p.rapidapi.com"
 EXERCISEDB_HOST2 = "exercise-db-fitness-workout-gym.p.rapidapi.com"
+THEMEALDB_API_URL = "https://www.themealdb.com/api/json/v1/1"
+USDA_API_KEY = "uH2TDQWthtdFvLn6Bz4wXe2VLBBGwA3SbeHPnGkJ"
+USDA_API_URL = "https://api.nal.usda.gov/fdc/v1"
 
 [observability]
 enabled = true
