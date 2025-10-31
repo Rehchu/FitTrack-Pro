@@ -69,12 +69,10 @@ export default {
     
     if (isLoginPath && request.method === 'GET') {
       console.log('Serving login page for path:', path);
-        return new Response(`DEBUG: path="${path}", isLoginPath=${isLoginPath}, method=${request.method}\n\n${getLoginHTML()}`, {
-          headers: { 
-            'Content-Type': 'text/html; charset=UTF-8',
-            'X-Debug-Path': path,
-            'X-Debug-IsLoginPath': isLoginPath.toString()
-          }
+      return new Response(getLoginHTML(), {
+        headers: { 
+          'Content-Type': 'text/html; charset=UTF-8'
+        }
       });
     }
 
