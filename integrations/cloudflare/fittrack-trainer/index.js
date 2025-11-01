@@ -12,6 +12,71 @@ export default {
       const path = url.pathname;
       const clientIp = request.headers.get('CF-Connecting-IP') || 'unknown';
 
+      // ========================================================================
+      // CUSTOM URL ROUTING - Extract trainer/client from subdomain
+      // ========================================================================
+      // Supports: fittrack-{slug}.workers.dev or {slug}.yourdomain.com
+      const hostname = url.hostname;
+      let customSlug = null;
+      let portalType = null; // 'trainer' or 'client'
+      
+      // Extract slug from hostname patterns:
+      // 1. fittrack-{slug}.workers.dev -> slug = {slug}
+      // 2. {slug}.fittrackpro.com -> slug = {slug}
+      // 3. trainer-{slug}.workers.dev -> slug = {slug}, type = trainer
+      // 4. client-{slug}.workers.dev -> slug = {slug}, type = client
+      
+      const workersDev = hostname.match(/^(?:fittrack-|trainer-|client-)?([a-z0-9-]+)\.(?:[a-z0-9-]+\.)?workers\.dev$/i);
+      const customDomain = hostname.match(/^([a-z0-9-]+)\./i);
+      
+      if (workersDev) {
+        customSlug = workersDev[1];
+        if (hostname.startsWith('trainer-')) portalType = 'trainer';
+        else if (hostname.startsWith('client-')) portalType = 'client';
+      } else if (customDomain && !hostname.includes('workers.dev')) {
+        customSlug = customDomain[1];
+      }
+      
+      // Look up trainer/client from slug if present (and not the default "rehchu1")
+      let trainerContext = null;
+      let clientContext = null;
+      
+      if (customSlug && customSlug !== 'rehchu1' && customSlug !== 'fittrack-trainer') {
+        try {
+          // Try trainer lookup first
+          const trainerQuery = await env.FITTRACK_D1.prepare(
+            'SELECT id, user_id, business_name, url_slug FROM trainers WHERE url_slug = ?'
+          ).bind(customSlug).first();
+          
+          if (trainerQuery) {
+            trainerContext = trainerQuery;
+            portalType = 'trainer';
+            console.log(`Custom URL: Trainer "${trainerQuery.business_name}" (slug: ${customSlug})`);
+          } else {
+            // Try client lookup
+            const clientQuery = await env.FITTRACK_D1.prepare(
+              'SELECT id, user_id, name, url_slug, trainer_id FROM clients WHERE url_slug = ?'
+            ).bind(customSlug).first();
+            
+            if (clientQuery) {
+              clientContext = clientQuery;
+              portalType = 'client';
+              console.log(`Custom URL: Client "${clientQuery.name}" (slug: ${customSlug})`);
+            }
+          }
+        } catch (slugError) {
+          console.error('Error looking up custom slug:', slugError);
+        }
+      }
+      
+      // Store context for later use
+      request.customUrlContext = {
+        slug: customSlug,
+        portalType,
+        trainer: trainerContext,
+        client: clientContext
+      };
+
       // Debug logs kept minimal to avoid noisy output; remove during production if needed.
       // console.log('Method:', request.method, 'Path:', path);
 
@@ -1123,13 +1188,35 @@ async function handleRegister(request, env) {
       "SELECT id, email FROM users WHERE email = ? AND user_type = 'trainer'"
     ).bind(email.toLowerCase()).first();
 
-    // Create trainer profile
+    // Generate URL slug from business name or email
+    const slugBase = businessName || email.split('@')[0];
+    let urlSlug = slugBase.toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')  // Replace non-alphanumeric with hyphens
+      .replace(/^-|-$/g, '');        // Remove leading/trailing hyphens
+    
+    // Ensure slug is unique by appending number if needed
+    let slugAttempt = urlSlug;
+    let counter = 1;
+    while (true) {
+      const existingSlug = await env.FITTRACK_D1.prepare(
+        'SELECT id FROM trainers WHERE url_slug = ?'
+      ).bind(slugAttempt).first();
+      
+      if (!existingSlug) {
+        urlSlug = slugAttempt;
+        break;
+      }
+      slugAttempt = `${urlSlug}${counter}`;
+      counter++;
+    }
+
+    // Create trainer profile with URL slug
     await env.FITTRACK_D1.prepare(
-      'INSERT INTO trainers (user_id, business_name) VALUES (?, ?)'
-    ).bind(user.id, businessName || null).run();
+      'INSERT INTO trainers (user_id, business_name, url_slug) VALUES (?, ?, ?)'
+    ).bind(user.id, businessName || null, urlSlug).run();
 
     const trainer = await env.FITTRACK_D1.prepare(
-      'SELECT id, business_name FROM trainers WHERE user_id = ?'
+      'SELECT id, business_name, url_slug FROM trainers WHERE user_id = ?'
     ).bind(user.id).first();
 
     // Create session
@@ -1155,7 +1242,9 @@ async function handleRegister(request, env) {
       trainer: {
         id: trainer.id,
         email: user.email,
-        business_name: trainer.business_name || ''
+        business_name: trainer.business_name || '',
+        url_slug: trainer.url_slug,
+        custom_url: `https://fittrack-${trainer.url_slug}.workers.dev`
       }
     });
 
@@ -1269,6 +1358,82 @@ async function handleAPI(request, env, trainerId, path) {
     } catch (e) {
       console.error('USDA search error', e);
       return jsonResponse({ error: 'Failed to search USDA' }, 500);
+    }
+  }
+
+  // ========================================================================
+  // TRAINER PROFILE MANAGEMENT
+  // ========================================================================
+  
+  // Update trainer URL slug
+  if (path === '/api/trainer/url-slug' && method === 'PUT') {
+    try {
+      const { url_slug } = await request.json();
+      
+      if (!url_slug) {
+        return jsonResponse({ error: 'url_slug is required' }, 400);
+      }
+      
+      // Validate slug format (alphanumeric and hyphens only)
+      if (!/^[a-z0-9-]+$/.test(url_slug)) {
+        return jsonResponse({ 
+          error: 'Invalid slug format. Use only lowercase letters, numbers, and hyphens.' 
+        }, 400);
+      }
+      
+      // Check if slug is already taken
+      const existing = await env.FITTRACK_D1.prepare(
+        'SELECT id FROM trainers WHERE url_slug = ? AND id != ?'
+      ).bind(url_slug, trainerId).first();
+      
+      if (existing) {
+        return jsonResponse({ error: 'This URL slug is already taken' }, 409);
+      }
+      
+      // Update slug
+      await env.FITTRACK_D1.prepare(
+        'UPDATE trainers SET url_slug = ?, updated_at = datetime("now") WHERE id = ?'
+      ).bind(url_slug, trainerId).run();
+      
+      const trainer = await env.FITTRACK_D1.prepare(
+        'SELECT id, business_name, url_slug FROM trainers WHERE id = ?'
+      ).bind(trainerId).first();
+      
+      return jsonResponse({
+        success: true,
+        trainer: {
+          id: trainer.id,
+          business_name: trainer.business_name,
+          url_slug: trainer.url_slug,
+          custom_url: `https://fittrack-${trainer.url_slug}.workers.dev`
+        }
+      });
+    } catch (error) {
+      console.error('Error updating URL slug:', error);
+      return jsonResponse({ error: 'Failed to update URL slug' }, 500);
+    }
+  }
+  
+  // Get trainer profile (includes custom URL)
+  if (path === '/api/trainer/profile' && method === 'GET') {
+    try {
+      const trainer = await env.FITTRACK_D1.prepare(
+        'SELECT id, business_name, url_slug, logo_url, profile_completed FROM trainers WHERE id = ?'
+      ).bind(trainerId).first();
+      
+      if (!trainer) {
+        return jsonResponse({ error: 'Trainer not found' }, 404);
+      }
+      
+      return jsonResponse({
+        trainer: {
+          ...trainer,
+          custom_url: trainer.url_slug ? `https://fittrack-${trainer.url_slug}.workers.dev` : null
+        }
+      });
+    } catch (error) {
+      console.error('Error fetching trainer profile:', error);
+      return jsonResponse({ error: 'Failed to fetch profile' }, 500);
     }
   }
 
@@ -2646,6 +2811,35 @@ function renderTrainerPortal(trainer) {
         </div>
         <button class="btn" onclick="saveSettings()">Save Changes</button>
       </div>
+      
+      <div class="card">
+        <h2>Custom URL</h2>
+        <p style="color: var(--muted); margin-bottom: 16px;">
+          Your custom URL allows clients to access your portal directly. Choose a memorable slug!
+        </p>
+        <div class="form-group">
+          <label class="form-label">URL Slug</label>
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <span style="color: var(--muted);">fittrack-</span>
+            <input type="text" id="settings-url-slug" placeholder="your-name" 
+                   value="${trainer.url_slug || ''}" 
+                   style="flex: 1; min-width: 200px;"
+                   pattern="[a-z0-9-]+" 
+                   title="Only lowercase letters, numbers, and hyphens" />
+            <span style="color: var(--muted);">.workers.dev</span>
+          </div>
+          <small style="color: var(--muted); display: block; margin-top: 8px;">
+            Only lowercase letters, numbers, and hyphens (no spaces)
+          </small>
+        </div>
+        <div id="custom-url-preview" style="margin: 16px 0; padding: 12px; background: var(--panel-dark); border-radius: 8px; border: 2px solid var(--green);">
+          <div style="font-size: 0.85rem; color: var(--muted); margin-bottom: 4px;">Your Custom URL:</div>
+          <div style="font-size: 1.1rem; color: var(--green); font-weight: 600; word-break: break-all;" id="url-display">
+            ${trainer.url_slug ? `https://fittrack-${trainer.url_slug}.workers.dev` : 'Set a URL slug to get your custom URL'}
+          </div>
+        </div>
+        <button class="btn" onclick="saveCustomUrl()">Update Custom URL</button>
+      </div>
     </div>
   </div>
 
@@ -3612,6 +3806,64 @@ function renderTrainerPortal(trainer) {
         showToast('Failed to save settings');
       }
     }
+    
+    async function saveCustomUrl() {
+      try {
+        const url_slug = document.getElementById('settings-url-slug').value.trim().toLowerCase();
+        
+        if (!url_slug) {
+          showToast('Please enter a URL slug');
+          return;
+        }
+        
+        // Validate format
+        if (!/^[a-z0-9-]+$/.test(url_slug)) {
+          showToast('Invalid format. Use only lowercase letters, numbers, and hyphens.');
+          return;
+        }
+        
+        const r = await fetch('/api/trainer/url-slug', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url_slug })
+        });
+        
+        const d = await r.json();
+        
+        if (r.ok) {
+          showToast('Custom URL updated successfully!');
+          document.getElementById('url-display').textContent = d.trainer.custom_url;
+          
+          // Show copy button toast
+          setTimeout(() => {
+            showToast('Share your custom URL: ' + d.trainer.custom_url);
+          }, 1500);
+        } else {
+          showToast(d.error || 'Failed to update URL');
+        }
+      } catch (e) {
+        console.error('Error updating URL:', e);
+        showToast('Failed to update custom URL');
+      }
+    }
+    
+    // Real-time URL preview update
+    document.addEventListener('DOMContentLoaded', () => {
+      const slugInput = document.getElementById('settings-url-slug');
+      const urlDisplay = document.getElementById('url-display');
+      
+      if (slugInput && urlDisplay) {
+        slugInput.addEventListener('input', (e) => {
+          let slug = e.target.value.trim().toLowerCase();
+          
+          if (slug) {
+            urlDisplay.textContent = 'https://fittrack-' + slug + '.workers.dev';
+          } else {
+            urlDisplay.textContent = 'Set a URL slug to get your custom URL';
+          }
+        });
+      }
+    });
 
     // Load initial data
     loadClients();
