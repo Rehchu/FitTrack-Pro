@@ -113,6 +113,148 @@ export default {
     }
 
     // ========================================================================
+    // PUBLIC API ROUTES (No authentication required)
+    // ========================================================================
+    
+    // Unified Food Search (USDA + TheMealDB) - Available to both trainers and clients
+    if (path === '/api/food/search' && request.method === 'GET') {
+      const q = url.searchParams.get('q');
+      const limit = parseInt(url.searchParams.get('limit') || '20', 10);
+      if (!q) return jsonResponse({ error: 'Missing query parameter q' }, 400);
+      
+      try {
+        // Rate limiting for combined food search
+        const foodLimit = getEnvInt(env.RL_USDA_PER_MINUTE, 5);
+        if (foodLimit > 0) {
+          const rl = await rateLimit(env, 'food', clientIp, foodLimit, 60);
+          if (rl.limited) return rateLimitedResponse(rl);
+        }
+
+        // Check cache first
+        const cacheKey = `cache:food:${q}:limit=${limit}`;
+        const cached = await env.FITTRACK_KV.get(cacheKey);
+        if (cached) {
+          const resp = jsonResponse(JSON.parse(cached));
+          resp.headers.set('X-Cache', 'HIT');
+          return resp;
+        }
+
+        // Fetch from both APIs in parallel
+        const [usdaResults, mealDBResults] = await Promise.allSettled([
+          // USDA FoodData Central
+          (async () => {
+            const apiKey = env.USDA_API_KEY || 'DEMO_KEY';
+            const usdaUrl = `${env.USDA_API_URL || 'https://api.nal.usda.gov/fdc/v1'}/foods/search?query=${encodeURIComponent(q)}&pageSize=${Math.min(limit, 20)}&api_key=${encodeURIComponent(apiKey)}`;
+            const resp = await fetch(usdaUrl);
+            if (!resp.ok) throw new Error('USDA API error');
+            const data = await resp.json();
+            return (data.foods || []).map(food => {
+              const nutrients = {};
+              (food.foodNutrients || []).forEach(n => {
+                const name = (n.nutrientName || '').toLowerCase();
+                const value = n.value || 0;
+                if (name.includes('energy') || name.includes('calori')) nutrients.calories = value;
+                else if (name.includes('protein')) nutrients.protein = value;
+                else if (name.includes('carbohydrate')) nutrients.carbs = value;
+                else if (name.includes('total lipid') || (name.includes('fat') && !name.includes('fatty'))) nutrients.fat = value;
+                else if (name.includes('fiber')) nutrients.fiber = value;
+                else if (name.includes('sodium')) nutrients.sodium = value;
+              });
+              return {
+                source: 'USDA',
+                id: `usda-${food.fdcId}`,
+                name: food.description,
+                brand: food.brandOwner || null,
+                servingSize: food.servingSize,
+                servingUnit: food.servingSizeUnit || 'g',
+                calories: nutrients.calories || 0,
+                protein: nutrients.protein || 0,
+                carbs: nutrients.carbs || 0,
+                fat: nutrients.fat || 0,
+                fiber: nutrients.fiber || 0,
+                sodium: nutrients.sodium || 0
+              };
+            });
+          })(),
+          
+          // TheMealDB
+          (async () => {
+            const mealDBUrl = `${env.THEMEALDB_API_URL || 'https://www.themealdb.com/api/json/v1/1'}/search.php?s=${encodeURIComponent(q)}`;
+            const resp = await fetch(mealDBUrl);
+            if (!resp.ok) throw new Error('MealDB API error');
+            const data = await resp.json();
+            return (data.meals || []).slice(0, Math.floor(limit / 2)).map(meal => {
+              return {
+                source: 'TheMealDB',
+                id: `mealdb-${meal.idMeal}`,
+                name: meal.strMeal,
+                category: meal.strCategory,
+                area: meal.strArea,
+                thumb: meal.strMealThumb,
+                instructions: meal.strInstructions,
+                ingredients: Array.from({ length: 20 }, (_, i) => {
+                  const ingredient = meal[`strIngredient${i + 1}`];
+                  const measure = meal[`strMeasure${i + 1}`];
+                  if (ingredient && ingredient.trim()) {
+                    return { ingredient, measure };
+                  }
+                  return null;
+                }).filter(Boolean),
+                calories: null,
+                protein: null,
+                carbs: null,
+                fat: null
+              };
+            });
+          })()
+        ]);
+
+        // Merge results
+        const combinedFoods = [];
+        
+        if (usdaResults.status === 'fulfilled') {
+          combinedFoods.push(...usdaResults.value);
+        }
+        
+        if (mealDBResults.status === 'fulfilled') {
+          combinedFoods.push(...mealDBResults.value);
+        }
+
+        // Deduplicate by name (case-insensitive)
+        const seen = new Set();
+        const uniqueFoods = combinedFoods.filter(food => {
+          const key = food.name.toLowerCase().trim();
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+
+        // Limit results
+        const finalFoods = uniqueFoods.slice(0, limit);
+
+        const payload = {
+          query: q,
+          totalResults: finalFoods.length,
+          sources: {
+            usda: usdaResults.status === 'fulfilled' ? usdaResults.value.length : 0,
+            mealdb: mealDBResults.status === 'fulfilled' ? mealDBResults.value.length : 0
+          },
+          foods: finalFoods
+        };
+
+        // Cache for 6 hours
+        await env.FITTRACK_KV.put(cacheKey, JSON.stringify(payload), { expirationTtl: 21600 });
+        
+        const out = jsonResponse(payload);
+        out.headers.set('X-Cache', 'MISS');
+        return out;
+      } catch (e) {
+        console.error('Unified food search error:', e);
+        return jsonResponse({ error: 'Failed to search food databases' }, 500);
+      }
+    }
+
+    // ========================================================================
     // PROTECTED ROUTES (Authentication required)
     // ========================================================================
 
@@ -1127,151 +1269,6 @@ async function handleAPI(request, env, trainerId, path) {
     } catch (e) {
       console.error('USDA search error', e);
       return jsonResponse({ error: 'Failed to search USDA' }, 500);
-    }
-  }
-
-  // ========================================================================
-  // UNIFIED FOOD SEARCH (USDA + TheMealDB)
-  // ========================================================================
-  
-  // Search food from both USDA FoodData Central AND TheMealDB
-  if (path === '/api/food/search' && method === 'GET') {
-    const q = url.searchParams.get('q');
-    const limit = parseInt(url.searchParams.get('limit') || '20', 10);
-    if (!q) return jsonResponse({ error: 'Missing query parameter q' }, 400);
-    
-    try {
-      // Rate limiting for combined food search
-      const foodLimit = getEnvInt(env.RL_USDA_PER_MINUTE, 5);
-      if (foodLimit > 0) {
-        const rl = await rateLimit(env, 'food', clientIp, foodLimit, 60);
-        if (rl.limited) return rateLimitedResponse(rl);
-      }
-
-      // Check cache first
-      const cacheKey = `cache:food:${q}:limit=${limit}`;
-      const cached = await env.FITTRACK_KV.get(cacheKey);
-      if (cached) {
-        const resp = jsonResponse(JSON.parse(cached));
-        resp.headers.set('X-Cache', 'HIT');
-        return resp;
-      }
-
-      // Fetch from both APIs in parallel
-      const [usdaResults, mealDBResults] = await Promise.allSettled([
-        // USDA FoodData Central
-        (async () => {
-          const apiKey = env.USDA_API_KEY || 'DEMO_KEY';
-          const usdaUrl = `${env.USDA_API_URL || 'https://api.nal.usda.gov/fdc/v1'}/foods/search?query=${encodeURIComponent(q)}&pageSize=${Math.min(limit, 20)}&api_key=${encodeURIComponent(apiKey)}`;
-          const resp = await fetch(usdaUrl);
-          if (!resp.ok) throw new Error('USDA API error');
-          const data = await resp.json();
-          return (data.foods || []).map(food => {
-            const nutrients = {};
-            (food.foodNutrients || []).forEach(n => {
-              const name = (n.nutrientName || '').toLowerCase();
-              const value = n.value || 0;
-              if (name.includes('energy') || name.includes('calori')) nutrients.calories = value;
-              else if (name.includes('protein')) nutrients.protein = value;
-              else if (name.includes('carbohydrate')) nutrients.carbs = value;
-              else if (name.includes('total lipid') || (name.includes('fat') && !name.includes('fatty'))) nutrients.fat = value;
-              else if (name.includes('fiber')) nutrients.fiber = value;
-              else if (name.includes('sodium')) nutrients.sodium = value;
-            });
-            return {
-              source: 'USDA',
-              id: `usda-${food.fdcId}`,
-              name: food.description,
-              brand: food.brandOwner || null,
-              servingSize: food.servingSize,
-              servingUnit: food.servingSizeUnit || 'g',
-              calories: nutrients.calories || 0,
-              protein: nutrients.protein || 0,
-              carbs: nutrients.carbs || 0,
-              fat: nutrients.fat || 0,
-              fiber: nutrients.fiber || 0,
-              sodium: nutrients.sodium || 0
-            };
-          });
-        })(),
-        
-        // TheMealDB
-        (async () => {
-          const mealDBUrl = `${env.THEMEALDB_API_URL || 'https://www.themealdb.com/api/json/v1/1'}/search.php?s=${encodeURIComponent(q)}`;
-          const resp = await fetch(mealDBUrl);
-          if (!resp.ok) throw new Error('MealDB API error');
-          const data = await resp.json();
-          return (data.meals || []).slice(0, Math.floor(limit / 2)).map(meal => {
-            // TheMealDB doesn't have nutrition data, so we provide meal structure
-            return {
-              source: 'TheMealDB',
-              id: `mealdb-${meal.idMeal}`,
-              name: meal.strMeal,
-              category: meal.strCategory,
-              area: meal.strArea,
-              thumb: meal.strMealThumb,
-              instructions: meal.strInstructions,
-              // Extract ingredients
-              ingredients: Array.from({ length: 20 }, (_, i) => {
-                const ingredient = meal[`strIngredient${i + 1}`];
-                const measure = meal[`strMeasure${i + 1}`];
-                if (ingredient && ingredient.trim()) {
-                  return { ingredient, measure };
-                }
-                return null;
-              }).filter(Boolean),
-              // No nutrition data from TheMealDB (free tier)
-              calories: null,
-              protein: null,
-              carbs: null,
-              fat: null
-            };
-          });
-        })()
-      ]);
-
-      // Merge results
-      const combinedFoods = [];
-      
-      if (usdaResults.status === 'fulfilled') {
-        combinedFoods.push(...usdaResults.value);
-      }
-      
-      if (mealDBResults.status === 'fulfilled') {
-        combinedFoods.push(...mealDBResults.value);
-      }
-
-      // Deduplicate by name (case-insensitive)
-      const seen = new Set();
-      const uniqueFoods = combinedFoods.filter(food => {
-        const key = food.name.toLowerCase().trim();
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      });
-
-      // Limit results
-      const finalFoods = uniqueFoods.slice(0, limit);
-
-      const payload = {
-        query: q,
-        totalResults: finalFoods.length,
-        sources: {
-          usda: usdaResults.status === 'fulfilled' ? usdaResults.value.length : 0,
-          mealdb: mealDBResults.status === 'fulfilled' ? mealDBResults.value.length : 0
-        },
-        foods: finalFoods
-      };
-
-      // Cache for 6 hours
-      await env.FITTRACK_KV.put(cacheKey, JSON.stringify(payload), { expirationTtl: 21600 });
-      
-      const out = jsonResponse(payload);
-      out.headers.set('X-Cache', 'MISS');
-      return out;
-    } catch (e) {
-      console.error('Unified food search error:', e);
-      return jsonResponse({ error: 'Failed to search food databases' }, 500);
     }
   }
 
