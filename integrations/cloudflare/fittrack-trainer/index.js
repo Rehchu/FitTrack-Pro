@@ -2428,6 +2428,23 @@ function renderTrainerPortal(trainer) {
       height: 30px;
     }
     .close-btn:hover { color: var(--text); }
+    
+    /* Global Client Selector Styles */
+    #global-client-selector:hover {
+      border-color: var(--green);
+      box-shadow: 0 0 12px rgba(0,255,65,0.3);
+    }
+    #global-client-selector:focus {
+      outline: none;
+      border-color: var(--purple);
+      box-shadow: 0 0 16px rgba(176,38,255,0.5);
+    }
+    #global-client-selector option {
+      background: var(--panel);
+      color: var(--text);
+      padding: 8px;
+    }
+    
     .toast {
       position: fixed;
       bottom: 20px;
@@ -2480,6 +2497,27 @@ function renderTrainerPortal(trainer) {
     <button class="btn btn-secondary" onclick="logout()">Log Out</button>
   </header>
 
+  <!-- Global Client Selector Bar -->
+  <div style="padding: 16px 24px; background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%); border-bottom: 2px solid var(--purple); box-shadow: 0 4px 12px rgba(176, 38, 255, 0.2);">
+    <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="font-size: 1.5rem;">👤</span>
+        <label style="font-weight: 700; color: var(--heading); font-size: 1rem; text-shadow: 0 0 8px rgba(0,255,65,0.3);">
+          Active Client:
+        </label>
+      </div>
+      <select id="global-client-selector" 
+              onchange="onGlobalClientChange()" 
+              style="flex: 1; max-width: 500px; padding: 12px 16px; background: var(--panel); color: var(--text); border: 2px solid var(--border); border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: all 0.3s;">
+        <option value="">⚠️ Select a client to begin...</option>
+      </select>
+      <div id="client-status-indicator" style="display: flex; align-items: center; gap: 8px; padding: 8px 16px; background: var(--panel-dark); border: 2px solid var(--border); border-radius: 8px;">
+        <span id="client-status-icon" style="font-size: 1.2rem;">⏸️</span>
+        <span id="client-status-text" style="color: var(--muted); font-weight: 600;">No client selected</span>
+      </div>
+    </div>
+  </div>
+
   <div class="tabs">
     <button class="tab active" onclick="showTab('dashboard')">📊 Dashboard</button>
     <button class="tab" onclick="showTab('clients')">👥 Clients</button>
@@ -2489,17 +2527,6 @@ function renderTrainerPortal(trainer) {
     <button class="tab" onclick="showTab('workouts')">💪 Workouts</button>
     <button class="tab" onclick="showTab('analytics')">📈 Analytics</button>
     <button class="tab" onclick="showTab('settings')">⚙️ Settings</button>
-  </div>
-
-  <!-- Global Client Selector -->
-  <div class="container" style="padding: 12px 24px; background: var(--bg-secondary); border-bottom: 1px solid var(--border);">
-    <div style="display: flex; align-items: center; gap: 12px;">
-      <label style="font-weight: 600; color: var(--text);">Current Client:</label>
-      <select id="global-client" onchange="onGlobalClientChange()" style="flex: 1; max-width: 400px; padding: 8px 12px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px;">
-        <option value="">Select a client to get started...</option>
-      </select>
-      <span id="client-indicator" style="color: var(--muted); font-size: 0.9rem;"></span>
-    </div>
   </div>
 
   <div class="container">
@@ -3622,6 +3649,19 @@ function renderTrainerPortal(trainer) {
           
           // Update dashboard stat
           document.getElementById('stat-clients').textContent = data.clients.length;
+          
+          // Populate global client selector
+          const selector = document.getElementById('global-client-selector');
+          if (selector) {
+            const currentValue = sessionStorage.getItem('selectedClientId');
+            selector.innerHTML = '<option value="">⚠️ Select a client to begin...</option>' +
+              data.clients.map(c => \`<option value="\${c.id}" \${c.id == currentValue ? 'selected' : ''}>\${c.name}</option>\`).join('');
+            
+            // Restore selection if exists
+            if (currentValue) {
+              updateClientStatusIndicator(data.clients.find(c => c.id == currentValue));
+            }
+          }
         }
       } catch (error) {
         console.error('Error loading clients:', error);
@@ -3845,6 +3885,73 @@ function renderTrainerPortal(trainer) {
         console.error('Error updating URL:', e);
         showToast('Failed to update custom URL');
       }
+    }
+    
+    // Global Client Selector Functions
+    function onGlobalClientChange() {
+      const selector = document.getElementById('global-client-selector');
+      const clientId = selector.value;
+      
+      if (clientId) {
+        // Store in sessionStorage
+        sessionStorage.setItem('selectedClientId', clientId);
+        
+        // Get client name from selector
+        const selectedOption = selector.options[selector.selectedIndex];
+        const clientName = selectedOption.text;
+        
+        // Update status indicator
+        updateClientStatusIndicator({ id: clientId, name: clientName });
+        
+        // Show success toast
+        showToast(\`Now editing: \${clientName}\`);
+        
+        // Reload relevant data for selected client
+        loadClientData(clientId);
+      } else {
+        // Clear selection
+        sessionStorage.removeItem('selectedClientId');
+        updateClientStatusIndicator(null);
+      }
+    }
+    
+    function updateClientStatusIndicator(client) {
+      const icon = document.getElementById('client-status-icon');
+      const text = document.getElementById('client-status-text');
+      
+      if (client) {
+        icon.textContent = '✅';
+        text.textContent = \`Editing: \${client.name}\`;
+        text.style.color = 'var(--green)';
+      } else {
+        icon.textContent = '⏸️';
+        text.textContent = 'No client selected';
+        text.style.color = 'var(--muted)';
+      }
+    }
+    
+    function getSelectedClientId() {
+      const clientId = sessionStorage.getItem('selectedClientId');
+      if (!clientId) {
+        showToast('⚠️ Please select a client first');
+        return null;
+      }
+      return clientId;
+    }
+    
+    function requireClientSelection(action) {
+      const clientId = getSelectedClientId();
+      if (!clientId) {
+        showToast('⚠️ Please select a client from the dropdown above');
+        return false;
+      }
+      return true;
+    }
+    
+    async function loadClientData(clientId) {
+      // This will load client-specific data when implemented
+      console.log('Loading data for client:', clientId);
+      // Future: Load meals, workouts, measurements for this client
     }
     
     // Real-time URL preview update
