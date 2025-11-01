@@ -1438,6 +1438,144 @@ async function handleAPI(request, env, trainerId, path) {
   }
 
   // ========================================================================
+  // MEAL PLANNING WITH PERMISSIONS
+  // ========================================================================
+  
+  // Create meal plan (trainer only)
+  if (path === '/api/meals' && method === 'POST') {
+    try {
+      const { client_id, meal_name, meal_date, target_calories, notes } = await request.json();
+      
+      if (!client_id || !meal_name) {
+        return jsonResponse({ error: 'client_id and meal_name are required' }, 400);
+      }
+      
+      // Insert meal
+      const result = await env.FITTRACK_D1.prepare(`
+        INSERT INTO meals (client_id, meal_name, meal_date, target_calories, notes, created_by)
+        VALUES (?, ?, ?, ?, ?, 'trainer')
+      `).bind(
+        client_id,
+        meal_name,
+        meal_date || new Date().toISOString().slice(0, 10),
+        target_calories || null,
+        notes || null
+      ).run();
+      
+      const meal = await env.FITTRACK_D1.prepare(
+        'SELECT * FROM meals WHERE id = ?'
+      ).bind(result.meta.last_row_id).first();
+      
+      return jsonResponse({ success: true, meal });
+    } catch (error) {
+      console.error('Error creating meal:', error);
+      return jsonResponse({ error: 'Failed to create meal' }, 500);
+    }
+  }
+  
+  // Get meals for a client
+  if (path === '/api/meals' && method === 'GET') {
+    try {
+      const client_id = url.searchParams.get('client_id');
+      
+      if (!client_id) {
+        return jsonResponse({ error: 'client_id is required' }, 400);
+      }
+      
+      const meals = await env.FITTRACK_D1.prepare(`
+        SELECT * FROM meals 
+        WHERE client_id = ? 
+        ORDER BY meal_date DESC, created_at DESC
+      `).bind(client_id).all();
+      
+      return jsonResponse({ meals: meals.results || [] });
+    } catch (error) {
+      console.error('Error fetching meals:', error);
+      return jsonResponse({ error: 'Failed to fetch meals' }, 500);
+    }
+  }
+  
+  // Add meal item (trainer or client)
+  if (path.match(/^\/api\/meals\/(\d+)\/items$/) && method === 'POST') {
+    try {
+      const mealId = path.match(/^\/api\/meals\/(\d+)\/items$/)[1];
+      const { food_name, calories, protein, carbs, fat, serving_size, created_by } = await request.json();
+      
+      if (!food_name || !calories) {
+        return jsonResponse({ error: 'food_name and calories are required' }, 400);
+      }
+      
+      // Validate created_by
+      const createdBy = created_by === 'client' ? 'client' : 'trainer';
+      
+      const result = await env.FITTRACK_D1.prepare(`
+        INSERT INTO meal_items (meal_id, food_name, calories, protein, carbs, fat, serving_size, created_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        mealId,
+        food_name,
+        calories,
+        protein || null,
+        carbs || null,
+        fat || null,
+        serving_size || null,
+        createdBy
+      ).run();
+      
+      const item = await env.FITTRACK_D1.prepare(
+        'SELECT * FROM meal_items WHERE id = ?'
+      ).bind(result.meta.last_row_id).first();
+      
+      return jsonResponse({ success: true, item });
+    } catch (error) {
+      console.error('Error adding meal item:', error);
+      return jsonResponse({ error: 'Failed to add meal item' }, 500);
+    }
+  }
+  
+  // Get meal items for a meal
+  if (path.match(/^\/api\/meals\/(\d+)\/items$/) && method === 'GET') {
+    try {
+      const mealId = path.match(/^\/api\/meals\/(\d+)\/items$/)[1];
+      
+      const items = await env.FITTRACK_D1.prepare(`
+        SELECT * FROM meal_items 
+        WHERE meal_id = ? 
+        ORDER BY created_at ASC
+      `).bind(mealId).all();
+      
+      return jsonResponse({ items: items.results || [] });
+    } catch (error) {
+      console.error('Error fetching meal items:', error);
+      return jsonResponse({ error: 'Failed to fetch meal items' }, 500);
+    }
+  }
+  
+  // Mark meal item as completed (client only - future)
+  if (path.match(/^\/api\/meal-items\/(\d+)\/complete$/) && method === 'PATCH') {
+    try {
+      const itemId = path.match(/^\/api\/meal-items\/(\d+)\/complete$/)[1];
+      const { is_completed } = await request.json();
+      
+      await env.FITTRACK_D1.prepare(`
+        UPDATE meal_items 
+        SET is_completed = ?, 
+            completed_at = CASE WHEN ? = 1 THEN datetime('now') ELSE NULL END
+        WHERE id = ?
+      `).bind(is_completed ? 1 : 0, is_completed ? 1 : 0, itemId).run();
+      
+      const item = await env.FITTRACK_D1.prepare(
+        'SELECT * FROM meal_items WHERE id = ?'
+      ).bind(itemId).first();
+      
+      return jsonResponse({ success: true, item });
+    } catch (error) {
+      console.error('Error updating meal item:', error);
+      return jsonResponse({ error: 'Failed to update meal item' }, 500);
+    }
+  }
+
+  // ========================================================================
   // EXERCISEDB API INTEGRATION (Both databases)
   // ========================================================================
   
@@ -2707,51 +2845,83 @@ function renderTrainerPortal(trainer) {
     <div id="nutrition" class="content">
       <div class="card">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-          <h2 style="margin: 0;">Meal Plans</h2>
-          <button class="btn" onclick="openCreateMealPlanModal()">+ Create Meal Plan</button>
-        </div>
-        <div style="margin-bottom: 16px;">
-          <label class="form-label">Select Client (optional - leave blank for all):</label>
-          <select id="nutrition-client" onchange="loadMealPlans()" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #374151; background: #1f2937; color: white;">
-            <option value="">All clients</option>
-          </select>
+          <h2 style="margin: 0;">🍎 Meal Planning</h2>
+          <button class="btn" onclick="createMealPlan()" style="background: var(--green); border-color: var(--green);">
+            ➕ Create Meal Plan
+          </button>
         </div>
         
-        <!-- Search and Filter -->
-        <div style="margin-bottom: 16px; display: flex; gap: 12px;">
-          <input type="text" id="meal-search" placeholder="Search meal plans by name or description..." onkeyup="filterMealPlans()" style="flex: 1; padding: 8px; border-radius: 4px; border: 1px solid #374151; background: #1f2937; color: white;">
-          <select id="meal-filter-calories" onchange="filterMealPlans()" style="padding: 8px; border-radius: 4px; border: 1px solid #374151; background: #1f2937; color: white;">
-            <option value="">All Calories</option>
-            <option value="low">Low (<1500 cal)</option>
-            <option value="medium">Medium (1500-2500 cal)</option>
-            <option value="high">High (>2500 cal)</option>
-          </select>
-        </div>
-
-        <!-- USDA Food Search & Builder -->
-        <div class="card" style="background:#2a2f42; margin-bottom:16px;">
-          <h3 style="margin-bottom:10px;">USDA Food Search</h3>
-          <div style="display:flex; gap:8px; margin-bottom:8px;">
-            <input id="usda-food-search" type="text" placeholder="e.g., chicken breast, brown rice" style="flex:1;" />
-            <button class="btn" onclick="usdaSearch()">Search</button>
+        <!-- Client Reminder -->
+        <div id="meal-client-reminder" style="padding: 12px; background: rgba(176,38,255,0.1); border: 2px solid var(--purple); border-radius: 8px; margin-bottom: 16px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 1.2rem;">ℹ️</span>
+            <span style="color: var(--text); font-weight: 600;">
+              Select a client from the dropdown above to create and view meal plans
+            </span>
           </div>
-          <div style="display:grid; grid-template-columns: 2fr 1fr; gap:16px;">
+        </div>
+        
+        <!-- Unified Food Search (USDA + TheMealDB) -->
+        <div class="card" style="background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%); border: 2px solid var(--green); margin-bottom: 20px;">
+          <h3 style="margin-bottom: 12px; color: var(--green); text-shadow: 0 0 10px rgba(0,255,65,0.3);">
+            🔍 Search Foods (USDA + TheMealDB)
+          </h3>
+          <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+            <input 
+              id="unified-food-search" 
+              type="text" 
+              placeholder="Search foods (e.g., chicken breast, pasta, salad)..." 
+              style="flex: 1; padding: 10px; background: var(--panel); border: 2px solid var(--border); border-radius: 8px; color: var(--text);" 
+              onkeypress="if(event.key==='Enter') searchUnifiedFood()"
+            />
+            <button class="btn" onclick="searchUnifiedFood()" style="background: var(--green); border-color: var(--green); min-width: 100px;">
+              Search
+            </button>
+          </div>
+          
+          <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 16px;">
+            <!-- Search Results -->
             <div>
-              <div id="usda-results" style="max-height:240px; overflow:auto; border:1px solid var(--border); border-radius:8px; padding:8px;">
-                <div class="muted">Search results will appear here.</div>
+              <h4 style="color: var(--muted); margin-bottom: 8px;">Results:</h4>
+              <div id="food-search-results" style="max-height: 300px; overflow-y: auto; border: 2px solid var(--border); border-radius: 8px; padding: 12px; background: var(--panel-dark);">
+                <div style="color: var(--muted); text-align: center; padding: 20px;">
+                  Search for foods to add to meal plans
+                </div>
               </div>
             </div>
+            
+            <!-- Selected Items Basket -->
             <div>
-              <h4 style="margin:6px 0;">Selected Items</h4>
-              <div id="usda-selected" style="max-height:160px; overflow:auto; border:1px solid var(--border); border-radius:8px; padding:8px;"></div>
-              <div id="usda-totals" style="margin-top:8px; color:var(--muted);"></div>
-              <button class="btn" style="margin-top:10px; width:100%;" onclick="saveSelectionAsMealPlan()">Save as Meal Plan</button>
+              <h4 style="color: var(--muted); margin-bottom: 8px;">Selected Items:</h4>
+              <div id="food-basket" style="min-height: 200px; max-height: 300px; overflow-y: auto; border: 2px solid var(--purple); border-radius: 8px; padding: 12px; background: var(--panel-dark);">
+                <div style="color: var(--muted); text-align: center; padding: 20px; font-size: 0.9rem;">
+                  Click items to add to basket
+                </div>
+              </div>
+              <div id="basket-totals" style="margin-top: 12px; padding: 12px; background: var(--panel); border-radius: 8px; border: 2px solid var(--border);">
+                <div style="font-weight: 600; color: var(--heading); margin-bottom: 4px;">Totals:</div>
+                <div style="color: var(--muted); font-size: 0.9rem;">
+                  <div>Calories: <span id="total-calories">0</span> kcal</div>
+                  <div>Protein: <span id="total-protein">0</span>g</div>
+                  <div>Carbs: <span id="total-carbs">0</span>g</div>
+                  <div>Fat: <span id="total-fat">0</span>g</div>
+                </div>
+              </div>
+              <button class="btn" onclick="saveFoodsAsMealPlan()" style="width: 100%; margin-top: 12px; background: var(--purple); border-color: var(--purple);">
+                💾 Save as Meal Plan
+              </button>
             </div>
           </div>
         </div>
         
-        <div id="meal-plans-list">
-          <p style="color: var(--muted);">Loading meal plans...</p>
+        <!-- Existing Meal Plans -->
+        <div class="card" style="background: var(--panel-dark);">
+          <h3 style="margin-bottom: 16px; color: var(--heading);">📋 Current Meal Plans</h3>
+          <div id="meal-plans-list">
+            <p style="color: var(--muted); text-align: center; padding: 20px;">
+              Select a client to view their meal plans
+            </p>
+          </div>
         </div>
       </div>
     </div>
@@ -3949,10 +4119,282 @@ function renderTrainerPortal(trainer) {
     }
     
     async function loadClientData(clientId) {
-      // This will load client-specific data when implemented
       console.log('Loading data for client:', clientId);
-      // Future: Load meals, workouts, measurements for this client
+      // Load meals for this client
+      await loadMealPlans(clientId);
     }
+    
+    // ========================================================================
+    // MEAL PLANNING FUNCTIONS
+    // ========================================================================
+    
+    let foodBasket = [];  // Stores selected foods
+    
+    async function searchUnifiedFood() {
+      const query = document.getElementById('unified-food-search').value.trim();
+      if (!query) {
+        showToast('Enter a search term');
+        return;
+      }
+      
+      try {
+        const response = await fetch(\`/api/food/search?q=\${encodeURIComponent(query)}&limit=15\`);
+        const data = await response.json();
+        
+        if (!response.ok) {
+          showToast(data.error || 'Search failed');
+          return;
+        }
+        
+        const resultsDiv = document.getElementById('food-search-results');
+        
+        if (data.foods && data.foods.length > 0) {
+          resultsDiv.innerHTML = data.foods.map(food => {
+            const isUSDA = food.source === 'USDA';
+            const calories = food.calories || 0;
+            const protein = food.protein || 0;
+            const carbs = food.carbs || 0;
+            const fat = food.fat || 0;
+            
+            return \`
+              <div style="padding: 12px; margin-bottom: 8px; background: var(--panel); border: 2px solid var(--border); border-radius: 8px; cursor: pointer; transition: all 0.2s;" 
+                   onclick="addToBasket(\${JSON.stringify(food).replace(/"/g, '&quot;')})"
+                   onmouseover="this.style.borderColor='var(--green)'; this.style.boxShadow='0 0 12px rgba(0,255,65,0.3)'"
+                   onmouseout="this.style.borderColor='var(--border)'; this.style.boxShadow='none'">
+                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 4px;">
+                  <div style="font-weight: 600; color: var(--heading); flex: 1;">\${food.name}</div>
+                  <span style="background: \${isUSDA ? 'var(--green)' : 'var(--purple)'}; color: white; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">
+                    \${food.source}
+                  </span>
+                </div>
+                \${food.brand ? \`<div style="color: var(--muted); font-size: 0.85rem; margin-bottom: 4px;">\${food.brand}</div>\` : ''}
+                \${isUSDA ? \`
+                  <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 8px; font-size: 0.85rem;">
+                    <div><span style="color: var(--muted);">Cal:</span> <span style="color: var(--text); font-weight: 600;">\${Math.round(calories)}</span></div>
+                    <div><span style="color: var(--muted);">Pro:</span> <span style="color: var(--text); font-weight: 600;">\${Math.round(protein)}g</span></div>
+                    <div><span style="color: var(--muted);">Carbs:</span> <span style="color: var(--text); font-weight: 600;">\${Math.round(carbs)}g</span></div>
+                    <div><span style="color: var(--muted);">Fat:</span> <span style="color: var(--text); font-weight: 600;">\${Math.round(fat)}g</span></div>
+                  </div>
+                \` : \`
+                  <div style="color: var(--muted); font-size: 0.85rem; margin-top: 4px;">
+                    \${food.category ? \`Category: \${food.category} | \` : ''}\${food.area || 'Recipe'}
+                  </div>
+                \`}
+              </div>
+            \`;
+          }).join('');
+        } else {
+          resultsDiv.innerHTML = '<div style="color: var(--muted); text-align: center; padding: 20px;">No results found. Try a different search term.</div>';
+        }
+      } catch (error) {
+        console.error('Food search error:', error);
+        showToast('Search failed');
+      }
+    }
+    
+    function addToBasket(food) {
+      foodBasket.push(food);
+      updateBasketDisplay();
+      showToast(\`Added: \${food.name}\`);
+    }
+    
+    function removeFromBasket(index) {
+      foodBasket.splice(index, 1);
+      updateBasketDisplay();
+    }
+    
+    function updateBasketDisplay() {
+      const basketDiv = document.getElementById('food-basket');
+      
+      if (foodBasket.length === 0) {
+        basketDiv.innerHTML = '<div style="color: var(--muted); text-align: center; padding: 20px; font-size: 0.9rem;">Click items to add to basket</div>';
+        document.getElementById('total-calories').textContent = '0';
+        document.getElementById('total-protein').textContent = '0';
+        document.getElementById('total-carbs').textContent = '0';
+        document.getElementById('total-fat').textContent = '0';
+        return;
+      }
+      
+      basketDiv.innerHTML = foodBasket.map((food, index) => \`
+        <div style="padding: 8px; margin-bottom: 6px; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; display: flex; justify-content: space-between; align-items: center;">
+          <div style="flex: 1; font-size: 0.85rem;">
+            <div style="font-weight: 600; color: var(--text);">\${food.name}</div>
+            \${food.calories ? \`<div style="color: var(--muted); font-size: 0.75rem;">\${Math.round(food.calories)} cal</div>\` : ''}
+          </div>
+          <button onclick="removeFromBasket(\${index})" style="background: var(--error); border: none; color: white; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.75rem;">✕</button>
+        </div>
+      \`).join('');
+      
+      // Calculate totals
+      const totals = foodBasket.reduce((acc, food) => {
+        acc.calories += food.calories || 0;
+        acc.protein += food.protein || 0;
+        acc.carbs += food.carbs || 0;
+        acc.fat += food.fat || 0;
+        return acc;
+      }, { calories: 0, protein: 0, carbs: 0, fat: 0 });
+      
+      document.getElementById('total-calories').textContent = Math.round(totals.calories);
+      document.getElementById('total-protein').textContent = Math.round(totals.protein);
+      document.getElementById('total-carbs').textContent = Math.round(totals.carbs);
+      document.getElementById('total-fat').textContent = Math.round(totals.fat);
+    }
+    
+    async function saveFoodsAsMealPlan() {
+      const clientId = getSelectedClientId();
+      if (!clientId) return;
+      
+      if (foodBasket.length === 0) {
+        showToast('Add some foods first');
+        return;
+      }
+      
+      const mealName = prompt('Enter meal plan name:');
+      if (!mealName) return;
+      
+      try {
+        // Calculate total calories
+        const totalCalories = foodBasket.reduce((sum, food) => sum + (food.calories || 0), 0);
+        
+        // Create meal
+        const mealResponse = await fetch('/api/meals', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            client_id: clientId,
+            meal_name: mealName,
+            meal_date: new Date().toISOString().slice(0, 10),
+            target_calories: Math.round(totalCalories)
+          })
+        });
+        
+        const mealData = await mealResponse.json();
+        
+        if (!mealResponse.ok) {
+          showToast(mealData.error || 'Failed to create meal');
+          return;
+        }
+        
+        // Add all foods as meal items
+        for (const food of foodBasket) {
+          await fetch(\`/api/meals/\${mealData.meal.id}/items\`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              food_name: food.name,
+              calories: food.calories || 0,
+              protein: food.protein || 0,
+              carbs: food.carbs || 0,
+              fat: food.fat || 0,
+              serving_size: food.servingSize ? \`\${food.servingSize} \${food.servingUnit}\` : null,
+              created_by: 'trainer'
+            })
+          });
+        }
+        
+        showToast(\`✅ Meal plan "\${mealName}" created!\`);
+        foodBasket = [];
+        updateBasketDisplay();
+        loadMealPlans(clientId);
+      } catch (error) {
+        console.error('Error saving meal plan:', error);
+        showToast('Failed to save meal plan');
+      }
+    }
+    
+    async function loadMealPlans(clientId) {
+      if (!clientId) clientId = getSelectedClientId();
+      if (!clientId) {
+        document.getElementById('meal-plans-list').innerHTML = '<p style="color: var(--muted); text-align: center; padding: 20px;">Select a client to view their meal plans</p>';
+        return;
+      }
+      
+      try {
+        const response = await fetch(\`/api/meals?client_id=\${clientId}\`);
+        const data = await response.json();
+        
+        if (!response.ok) {
+          showToast(data.error || 'Failed to load meals');
+          return;
+        }
+        
+        const listDiv = document.getElementById('meal-plans-list');
+        
+        if (data.meals.length === 0) {
+          listDiv.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 20px;">No meal plans yet. Create one using the food search above!</p>';
+          return;
+        }
+        
+        listDiv.innerHTML = data.meals.map(meal => \`
+          <div style="padding: 16px; margin-bottom: 12px; background: var(--panel); border: 2px solid var(--border); border-radius: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
+              <div>
+                <div style="font-weight: 700; font-size: 1.1rem; color: var(--heading);">\${meal.meal_name}</div>
+                <div style="color: var(--muted); font-size: 0.85rem; margin-top: 4px;">
+                  📅 \${new Date(meal.meal_date).toLocaleDateString()} | 
+                  🔥 Target: \${meal.target_calories || 'N/A'} cal |
+                  👤 Created by: <span style="color: var(--green);">\${meal.created_by}</span>
+                </div>
+              </div>
+              <button onclick="viewMealItems(\${meal.id}, '\${meal.meal_name}')" class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.85rem;">
+                View Items
+              </button>
+            </div>
+            \${meal.notes ? \`<div style="color: var(--muted); font-size: 0.9rem; margin-top: 8px;">📝 \${meal.notes}</div>\` : ''}
+          </div>
+        \`).join('');
+      } catch (error) {
+        console.error('Error loading meals:', error);
+        showToast('Failed to load meal plans');
+      }
+    }
+    
+    async function viewMealItems(mealId, mealName) {
+      try {
+        const response = await fetch(\`/api/meals/\${mealId}/items\`);
+        const data = await response.json();
+        
+        if (!response.ok) {
+          showToast(data.error || 'Failed to load items');
+          return;
+        }
+        
+        const items = data.items || [];
+        
+        if (items.length === 0) {
+          alert(\`No items in "\${mealName}"\`);
+          return;
+        }
+        
+        const itemsHTML = items.map(item => \`
+          <div style="padding: 10px; margin-bottom: 8px; background: var(--panel-dark); border-radius: 6px;">
+            <div style="font-weight: 600; color: var(--text);">\${item.food_name}</div>
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 6px; font-size: 0.85rem;">
+              <div><span style="color: var(--muted);">Cal:</span> \${Math.round(item.calories)}</div>
+              <div><span style="color: var(--muted);">Pro:</span> \${Math.round(item.protein || 0)}g</div>
+              <div><span style="color: var(--muted);">Carbs:</span> \${Math.round(item.carbs || 0)}g</div>
+              <div><span style="color: var(--muted);">Fat:</span> \${Math.round(item.fat || 0)}g</div>
+            </div>
+            <div style="color: \${item.created_by === 'trainer' ? 'var(--green)' : 'var(--purple)'}; font-size: 0.75rem; margin-top: 4px;">
+              Added by: \${item.created_by}
+            </div>
+          </div>
+        \`).join('');
+        
+        const totalCal = items.reduce((sum, item) => sum + (item.calories || 0), 0);
+        const totalPro = items.reduce((sum, item) => sum + (item.protein || 0), 0);
+        const totalCarbs = items.reduce((sum, item) => sum + (item.carbs || 0), 0);
+        const totalFat = items.reduce((sum, item) => sum + (item.fat || 0), 0);
+        
+        alert(\`Items in "\${mealName}":\\n\\nTotal: \${Math.round(totalCal)} cal | \${Math.round(totalPro)}g pro | \${Math.round(totalCarbs)}g carbs | \${Math.round(totalFat)}g fat\\n\\n(See console for details)\`);
+        console.log('Meal items:', items);
+      } catch (error) {
+        console.error('Error loading meal items:', error);
+        showToast('Failed to load items');
+      }
+    }
+    
+    // ========================================================================
     
     // Real-time URL preview update
     document.addEventListener('DOMContentLoaded', () => {
